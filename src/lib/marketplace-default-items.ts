@@ -1,0 +1,68 @@
+import type { MarketplaceItem } from '../types/marketplace';
+
+export const defaultMarketplaceItems: MarketplaceItem[] = [
+  {
+    id: '1',
+    title: 'iPhone 12',
+    description: 'Téléphone en bon état.',
+    price: 180000,
+    category: 'electronique',
+    condition: 'good',
+    location: 'Moroni, Grande Comore',
+    images: [
+      'https://images.unsplash.com/photo-1605236453806-6ff36851218e?q=80&w=1200&auto=format&fit=crop',
+    ],
+    sellerId: 'u1',
+    sellerName: 'BazariYatrou',
+    createdAt: new Date().toISOString(),
+    status: 'available',
+  },
+  {
+    id: '2',
+    title: 'Canapé',
+    description: 'Canapé maison confortable.',
+    price: 80000,
+    category: 'maison',
+    condition: 'like-new',
+    location: 'Moroni, Grande Comore',
+    images: [
+      'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop',
+    ],
+    sellerId: 'u2',
+    sellerName: 'BazariYatrou',
+    createdAt: new Date().toISOString(),
+    status: 'available',
+  },
+  {
+    id: '3',
+    title: 'Toyota Corolla',
+    description: 'Voiture en état correct.',
+    price: 320000,
+    category: 'vehicule',
+    condition: 'fair',
+    location: 'Moroni, Grande Comore',
+    images: [
+      'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?q=80&w=1200&auto=format&fit=crop',
+    ],
+    sellerId: 'u3',
+    sellerName: 'BazariYatrou',
+    createdAt: new Date().toISOString(),
+    status: 'available',
+  },
+  {
+    id: '4',
+    title: 'Veste homme',
+    description: 'Vêtement neuf.',
+    price: 25000,
+    category: 'mode',
+    condition: 'new',
+    location: 'Moroni, Grande Comore',
+    images: [
+      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1200&auto=format&fit=crop',
+    ],
+    sellerId: 'u4',
+    sellerName: 'BazariYatrou',
+    createdAt: new Date().toISOString(),
+    status: 'available',
+  },
+];

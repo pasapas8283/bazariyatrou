@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BazariYatrou launcher icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803d" />
+      <stop offset="52%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#be123c" />
+    </linearGradient>
+  </defs>
+
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#bg)" />
+
+  <path d="M122 210L256 110L390 210H122Z" fill="#ffffff" />
+  <path d="M165 224H190V374H322V224H347V398H165V224Z" fill="#ffffff" />
+
+  <text
+    x="256"
+    y="338"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="176"
+    font-style="italic"
+    font-weight="700"
+    fill="#ffffff"
+  >
+    B
+  </text>
+</svg>

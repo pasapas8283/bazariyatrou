@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BazariYatrou">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#84cc16" />
+      <stop offset="55%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#be123c" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)" />
+  <path d="M94 205l162-122 162 122H94z" fill="#fff" />
+  <path d="M145 220h25v184h195V220h25v209H145z" fill="#fff" />
+  <text x="256" y="344" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="196" fill="#fff" font-style="italic">B</text>
+</svg>

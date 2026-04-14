@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BazariYatrou</string>
+    <string name="title_activity_main">BazariYatrou</string>
+    <string name="package_name">com.bazariyatrou.app</string>
+    <string name="custom_url_scheme">com.bazariyatrou.app</string>
+</resources>

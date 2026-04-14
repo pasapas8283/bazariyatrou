@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icône adaptive : marges fixes sur tout le pourtour (calque 108dp).
+  Moins d'inset = icône plus grande ; plus d'inset = plus petite (zone utile ~ 108 - 2×inset).
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/app_icon"
+    android:insetLeft="8dp"
+    android:insetTop="8dp"
+    android:insetRight="8dp"
+    android:insetBottom="8dp" />
