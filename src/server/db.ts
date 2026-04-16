@@ -130,7 +130,13 @@ async function writeSupabaseDb(next: DbShape) {
 
 export async function readDb(): Promise<DbShape> {
   if (isSupabaseEnabled()) {
-    return readSupabaseDb();
+    try {
+      return await readSupabaseDb();
+    } catch {
+      // Do not fail build/prerender if Supabase is temporarily unavailable
+      // or table setup is not finished yet.
+      return { ...defaultDb };
+    }
   }
 
   await ensureDbFile();
@@ -145,8 +151,13 @@ export async function readDb(): Promise<DbShape> {
 
 export async function writeDb(next: DbShape) {
   if (isSupabaseEnabled()) {
-    await writeSupabaseDb(next);
-    return;
+    try {
+      await writeSupabaseDb(next);
+      return;
+    } catch {
+      // Fall back to local file write when remote storage is unavailable.
+      // This keeps core flows usable during setup/recovery.
+    }
   }
 
   await ensureDbFile();
