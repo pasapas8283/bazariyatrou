@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: bazariyatrou
+    runtime: node
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:shared
+    healthCheckPath: /
+    envVars:
+      - key: BZY_SHARED_BETA
+        value: "1"
+      - key: NODE_ENV
+        value: production
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: BZY_DB_FILE
+        value: /data/bazariyatrou-db.json
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STATE_TABLE
+        value: app_state
