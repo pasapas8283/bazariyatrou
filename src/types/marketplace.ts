@@ -1,4 +1,4 @@
-export type ItemStatus = 'available' | 'sold';
+export type ItemStatus = 'available' | 'reserved' | 'sold';
 
 /** Devise d’affichage du prix sur l’annonce */
 export type PriceCurrency = 'KMF' | 'EUR';
@@ -61,6 +61,8 @@ export type MarketplaceItem = {
   createdAt: string;
   updatedAt?: string;
   status: ItemStatus;
+  /** Réservation temporaire ; repasse automatiquement en disponible à l’expiration. */
+  reservedUntil?: string;
   phone?: string;
   /** Numéro pour messagerie (WhatsApp) même si le téléphone n’est pas affiché publiquement */
   contactPhone?: string;

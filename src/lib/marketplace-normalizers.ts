@@ -41,7 +41,15 @@ export function normalizeCondition(value: unknown): MarketplaceItem['condition']
   return getConditionFromUnknown(value);
 }
 
-export function normalizeImages(raw: any): string[] {
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  if (value && typeof value === 'object') return value as UnknownRecord;
+  return {};
+}
+
+export function normalizeImages(rawInput: unknown): string[] {
+  const raw = asRecord(rawInput);
   if (Array.isArray(raw.images) && raw.images.length > 0) {
     const cleaned = raw.images.filter(
       (img: unknown) => typeof img === 'string' && img.trim() !== ''
@@ -60,10 +68,21 @@ export function normalizeImages(raw: any): string[] {
   return [fallbackImage];
 }
 
-export function normalizeLocation(raw: any): string {
+export function normalizeLocation(rawInput: unknown): string {
+  const raw = asRecord(rawInput);
+  const location =
+    typeof raw.location === 'string' && raw.location.trim() !== ''
+      ? raw.location
+      : undefined;
+  const city =
+    typeof raw.city === 'string' && raw.city.trim() !== '' ? raw.city : undefined;
+  const island =
+    typeof raw.island === 'string' && raw.island.trim() !== ''
+      ? raw.island
+      : undefined;
   return (
-    raw.location ??
-    (raw.city && raw.island ? `${raw.city}, ${raw.island}` : raw.city) ??
+    location ??
+    (city && island ? `${city}, ${island}` : city) ??
     'Non précisé'
   );
 }
@@ -109,11 +128,36 @@ function parsePositiveNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-export function normalizeItem(raw: any): MarketplaceItem {
+export function normalizeItem(rawInput: unknown): MarketplaceItem {
+  const raw = asRecord(rawInput);
+  const titleCandidate = raw.title ?? raw.titre ?? raw.name;
+  const descriptionCandidate = raw.description ?? raw.desc;
+  const sellerIdCandidate = raw.sellerId;
+  const sellerNameCandidate = raw.sellerName ?? raw.ownerName;
+  const createdAtCandidate = raw.createdAt;
+  const phoneCandidate = raw.phone ?? raw.telephone ?? raw.numero;
+  const reservedUntilCandidate =
+    typeof raw.reservedUntil === 'string' && raw.reservedUntil.trim() !== ''
+      ? raw.reservedUntil
+      : undefined;
+  const reservedStillActive =
+    reservedUntilCandidate != null &&
+    Number.isFinite(new Date(reservedUntilCandidate).getTime()) &&
+    new Date(reservedUntilCandidate).getTime() > Date.now();
+  const normalizedStatus: MarketplaceItem['status'] =
+    raw.status === 'sold'
+      ? 'sold'
+      : raw.status === 'reserved' && reservedStillActive
+        ? 'reserved'
+        : 'available';
   return {
     id: String(raw.id ?? crypto.randomUUID()),
-    title: raw.title ?? raw.titre ?? raw.name ?? 'Sans titre',
-    description: raw.description ?? raw.desc ?? '',
+    title:
+      typeof titleCandidate === 'string' && titleCandidate.trim() !== ''
+        ? titleCandidate
+        : 'Sans titre',
+    description:
+      typeof descriptionCandidate === 'string' ? descriptionCandidate : '',
     price: normalizePrice(raw.price ?? raw.prix),
     priceCurrency: normalizePriceCurrency(
       raw.priceCurrency ?? raw.devise ?? raw.currency
@@ -127,12 +171,25 @@ export function normalizeItem(raw: any): MarketplaceItem {
     condition: normalizeCondition(raw.condition ?? raw.etat),
     location: normalizeLocation(raw),
     images: normalizeImages(raw),
-    sellerId: raw.sellerId ?? 'unknown',
-    sellerName: raw.sellerName ?? raw.ownerName ?? 'Utilisateur',
-    createdAt: raw.createdAt ?? new Date().toISOString(),
-    updatedAt: raw.updatedAt,
-    status: raw.status === 'sold' ? 'sold' : 'available',
-    phone: raw.phone ?? raw.telephone ?? raw.numero ?? undefined,
+    sellerId:
+      typeof sellerIdCandidate === 'string' && sellerIdCandidate.trim() !== ''
+        ? sellerIdCandidate
+        : 'unknown',
+    sellerName:
+      typeof sellerNameCandidate === 'string' && sellerNameCandidate.trim() !== ''
+        ? sellerNameCandidate
+        : 'Utilisateur',
+    createdAt:
+      typeof createdAtCandidate === 'string' && createdAtCandidate.trim() !== ''
+        ? createdAtCandidate
+        : new Date().toISOString(),
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : undefined,
+    status: normalizedStatus,
+    reservedUntil: normalizedStatus === 'reserved' ? reservedUntilCandidate : undefined,
+    phone:
+      typeof phoneCandidate === 'string' && phoneCandidate.trim() !== ''
+        ? phoneCandidate
+        : undefined,
     contactPhone: (() => {
       const explicit =
         typeof raw.contactPhone === 'string' && raw.contactPhone.trim() !== ''
@@ -184,7 +241,7 @@ export function normalizeItem(raw: any): MarketplaceItem {
         : undefined,
     sellerType: raw.sellerType === 'pro' ? 'pro' : 'standard',
     ...(() => {
-      const sold = raw.status === 'sold';
+      const sold = normalizedStatus === 'sold';
       const bid =
         sold &&
         typeof raw.buyerId === 'string' &&

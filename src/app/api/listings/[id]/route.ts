@@ -9,11 +9,20 @@ import { listingPathParams } from '../../../../server/listing-static-params';
 
 type Params = { params: Promise<{ id: string }> };
 
-export const dynamic = 'force-dynamic';
-
 /** Requis pour `output: 'export'` (Capacitor) : au moins un `id` (voir `listingPathParams`). */
 export async function generateStaticParams() {
   return listingPathParams();
+}
+
+function resolveReserveDurationMs(): number {
+  const testMinutesRaw = process.env.BZY_RESERVE_TEST_MINUTES;
+  if (typeof testMinutesRaw === 'string' && testMinutesRaw.trim() !== '') {
+    const minutes = Number(testMinutesRaw);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      return Math.round(minutes * 60 * 1000);
+    }
+  }
+  return 24 * 60 * 60 * 1000;
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -59,6 +68,16 @@ export async function PATCH(request: Request, { params }: Params) {
     if (updates?.status === 'available') {
       merged.buyerId = undefined;
       merged.buyerName = undefined;
+      merged.reservedUntil = undefined;
+    } else if (updates?.status === 'reserved') {
+      merged.buyerId = undefined;
+      merged.buyerName = undefined;
+      const baseTs = Date.now();
+      merged.reservedUntil = new Date(
+        baseTs + resolveReserveDurationMs()
+      ).toISOString();
+    } else if (updates?.status === 'sold') {
+      merged.reservedUntil = undefined;
     } else if (
       updates &&
       typeof updates === 'object' &&
@@ -68,7 +87,12 @@ export async function PATCH(request: Request, { params }: Params) {
         typeof (current as { buyerId?: string }).buyerId === 'string'
           ? (current as { buyerId?: string }).buyerId
           : '';
-      const nextStatus = merged.status === 'sold' ? 'sold' : 'available';
+      const nextStatus =
+        merged.status === 'sold'
+          ? 'sold'
+          : merged.status === 'reserved'
+            ? 'reserved'
+            : 'available';
       const incoming =
         typeof (updates as { buyerId?: string }).buyerId === 'string'
           ? (updates as { buyerId?: string }).buyerId!.trim()

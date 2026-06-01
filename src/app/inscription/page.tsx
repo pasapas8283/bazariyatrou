@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -246,9 +247,11 @@ export default function InscriptionPage() {
               </div>
 
               {avatar && (
-                <img
+                <Image
                   src={avatar}
                   alt="Profil"
+                  width={80}
+                  height={80}
                   className="mt-3 h-20 w-20 rounded-full object-cover"
                 />
               )}

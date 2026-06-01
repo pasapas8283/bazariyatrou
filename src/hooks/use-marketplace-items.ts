@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { MarketplaceItem } from '../types/marketplace';
 import { getCurrentUser } from '../lib/auth-storage';
-import {
-  readMarketplaceItems,
-  writeMarketplaceItems,
-} from '../lib/marketplace-storage';
+import { writeMarketplaceItems } from '../lib/marketplace-storage';
 import { loadMergedMarketplaceItems } from '../lib/listings-merge';
+import { apiFetch } from '../lib/api-origin';
 
 /** Rafraîchit depuis l’API + local pendant que l’onglet est visible (délai = intervalle). */
 const LISTINGS_POLL_MS = 5000;
@@ -104,7 +102,7 @@ export function useMarketplaceItems() {
   }, [items, hydrated]);
 
   const availableItems = useMemo(
-    () => items.filter((item) => item.status === 'available'),
+    () => items.filter((item) => item.status !== 'sold'),
     [items]
   );
 
@@ -120,36 +118,45 @@ export function useMarketplaceItems() {
   const deleteItem = (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
     const actorId = getCurrentUser()?.id ?? '';
-    fetch(`/api/listings/${id}`, {
+    apiFetch(`/api/listings/${id}`, {
       method: 'DELETE',
       headers: actorId ? { 'x-bzy-user-id': actorId } : undefined,
     }).catch(() => {});
   };
 
-  const updateItemStatus = (
+  const updateItemStatus = useCallback((
     id: string,
     status: MarketplaceItem['status']
   ) => {
     const actorId = getCurrentUser()?.id;
     const now = new Date().toISOString();
+    const localReservedUntil =
+      status === 'reserved'
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : undefined;
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
           ? {
               ...item,
               status,
+              reservedUntil: localReservedUntil,
               updatedAt: now,
             }
           : item
       )
     );
-    fetch(`/api/listings/${id}`, {
+    apiFetch(`/api/listings/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         ...(actorId ? { 'x-bzy-user-id': actorId } : {}),
       },
-      body: JSON.stringify({ status, updatedAt: now }),
+      body: JSON.stringify({
+        status,
+        reservedUntil: localReservedUntil,
+        updatedAt: now,
+      }),
     })
       .then(async (res) => {
         if (!res.ok) return;
@@ -161,7 +168,7 @@ export function useMarketplaceItems() {
         }
       })
       .catch(() => {});
-  };
+  }, []);
 
   const updateItem = (id: string, updates: Partial<MarketplaceItem>) => {
     const actorId = getCurrentUser()?.id;
@@ -177,7 +184,7 @@ export function useMarketplaceItems() {
           : item
       )
     );
-    fetch(`/api/listings/${id}`, {
+    apiFetch(`/api/listings/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -186,6 +193,28 @@ export function useMarketplaceItems() {
       body: JSON.stringify({ ...updates, updatedAt: now }),
     }).catch(() => {});
   };
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const nowMs = Date.now();
+      const expiredIds = items
+        .filter((item) => {
+          if (item.status !== 'reserved') return false;
+          if (typeof item.reservedUntil !== 'string') return true;
+          const untilMs = new Date(item.reservedUntil).getTime();
+          if (!Number.isFinite(untilMs)) return true;
+          return nowMs >= untilMs;
+        })
+        .map((item) => item.id);
+
+      if (expiredIds.length === 0) return;
+      for (const id of expiredIds) {
+        updateItemStatus(id, 'available');
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [items, updateItemStatus]);
 
   return {
     items,

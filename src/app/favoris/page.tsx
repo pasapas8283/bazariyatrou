@@ -8,15 +8,15 @@ import DesktopTopNav from '@/components/DesktopTopNav';
 import { readFavorites, type FavoriteItem } from '../../lib/favorites-storage';
 
 export default function FavorisPage() {
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>(() =>
+    readFavorites()
+  );
 
   const loadFavorites = () => {
     setFavorites(readFavorites());
   };
 
   useEffect(() => {
-    loadFavorites();
-
     const onFocus = () => loadFavorites();
     window.addEventListener('focus', onFocus);
 

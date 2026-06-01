@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   beginPasswordReset,
   completePasswordReset,
@@ -12,21 +12,19 @@ import {
   registerUser,
   type AuthUser,
 } from '../lib/auth-storage';
+import { apiFetch } from '../lib/api-origin';
 
 export function useAuth() {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [usersCount, setUsersCount] = useState(0);
-  const [hydrated, setHydrated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() =>
+    getCurrentUser()
+  );
+  const [usersCount, setUsersCount] = useState(() => getAllUsers().length);
+  const hydrated = true;
 
   const refresh = () => {
     setCurrentUser(getCurrentUser());
     setUsersCount(getAllUsers().length);
   };
-
-  useEffect(() => {
-    refresh();
-    setHydrated(true);
-  }, []);
 
   const isLoggedIn = useMemo(() => !!currentUser, [currentUser]);
 
@@ -40,7 +38,7 @@ export function useAuth() {
   }) => {
     const result = registerUser(input);
     if (result.ok) {
-      void fetch('/api/auth/register', {
+      void apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -53,7 +51,7 @@ export function useAuth() {
   const login = (input: { phone: string; password: string }) => {
     const result = loginUser(input);
     if (result.ok) {
-      void fetch('/api/auth/login', {
+      void apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

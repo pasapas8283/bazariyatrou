@@ -8,8 +8,6 @@ import { listingPathParams } from '../../../../../server/listing-static-params';
 
 type Params = { params: Promise<{ id: string }> };
 
-export const dynamic = 'force-dynamic';
-
 export async function generateStaticParams() {
   return listingPathParams();
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import MobileShell from '@/components/MobileShell';
 import BottomNav from '@/components/BottomNav';
 import DesktopTopNav from '@/components/DesktopTopNav';
@@ -15,18 +15,11 @@ export default function ProfilPage() {
   const { currentUser, usersCount, isLoggedIn, logout, refresh } = useAuth();
 
   const [profile, setProfile] = useState<LocalProfile>({
-    name: 'Utilisateur',
-    phone: '',
-    avatar: '',
+    ...readProfile(),
   });
 
-  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [favoritesCount] = useState(() => readFavorites().length);
   const [editing, setEditing] = useState(false);
-
-  useEffect(() => {
-    setProfile(readProfile());
-    setFavoritesCount(readFavorites().length);
-  }, [currentUser]);
 
   const myItemsCount = useMemo(() => myItems.length, [myItems]);
 

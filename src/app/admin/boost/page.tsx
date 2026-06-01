@@ -5,6 +5,7 @@ import Link from 'next/link';
 import MobileShell from '@/components/MobileShell';
 import { formatListingPrice } from '@/lib/marketplace-formatters';
 import type { PriceCurrency } from '@/types/marketplace';
+import { apiFetch } from '@/lib/api-origin';
 
 type AdminItem = {
   id: string;
@@ -26,7 +27,7 @@ export default function AdminBoostPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/listings', { cache: 'no-store' });
+      const res = await apiFetch('/api/listings', { cache: 'no-store' });
       const data = await res.json();
       const list = Array.isArray(data?.items) ? data.items : [];
       setItems(list);
@@ -40,7 +41,7 @@ export default function AdminBoostPage() {
   }, []);
 
   const logoutAdmin = async () => {
-    await fetch('/api/admin/session', { method: 'DELETE' });
+    await apiFetch('/api/admin/session', { method: 'DELETE' });
     window.location.href = '/admin/login';
   };
 
@@ -58,7 +59,7 @@ export default function AdminBoostPage() {
   const patchItem = async (id: string, updates: Partial<AdminItem>) => {
     setBusyId(id);
     try {
-      await fetch(`/api/listings/${id}`, {
+      await apiFetch(`/api/listings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),

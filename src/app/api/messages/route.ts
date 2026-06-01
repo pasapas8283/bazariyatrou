@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { readDb, writeDb } from '../../../server/db';
 import type { Conversation } from '../../../lib/messages-storage';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ownerUserId = searchParams.get('ownerUserId');

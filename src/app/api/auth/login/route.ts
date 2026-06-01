@@ -3,8 +3,6 @@ import { verifyPasswordServer } from '../../../../server/security';
 import { readDb } from '../../../../server/db';
 import { applySessionCookie } from '../../../../server/auth-session';
 
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();

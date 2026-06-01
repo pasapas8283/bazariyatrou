@@ -9,6 +9,13 @@ export type FavoriteItem = {
 
 export const FAVORITES_STORAGE_KEY = 'bazariyatrou-favorites';
 
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  if (value && typeof value === 'object') return value as UnknownRecord;
+  return {};
+}
+
 export function readFavorites(): FavoriteItem[] {
   if (typeof window === 'undefined') return [];
 
@@ -18,17 +25,40 @@ export function readFavorites(): FavoriteItem[] {
 
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.map((item: any) => ({
+    return parsed.map((itemValue: unknown) => {
+      const item = asRecord(itemValue);
+      const title =
+        typeof item.title === 'string' && item.title.trim() !== ''
+          ? item.title
+          : 'Sans titre';
+      const price =
+        typeof item.price === 'string' && item.price.trim() !== ''
+          ? item.price
+          : 'Prix non renseigné';
+      const image =
+        typeof item.image === 'string' && item.image.trim() !== ''
+          ? item.image
+          : Array.isArray(item.images) &&
+              typeof item.images[0] === 'string' &&
+              item.images[0].trim() !== ''
+            ? item.images[0]
+            : 'https://placehold.co/600x400?text=Annonce';
+      const category =
+        typeof item.category === 'string' && item.category.trim() !== ''
+          ? item.category
+          : 'Catégories';
+      const condition =
+        typeof item.condition === 'string' ? item.condition : undefined;
+      return {
       id: String(item.id ?? crypto.randomUUID()),
-      title: item.title ?? 'Sans titre',
-      price: item.price ?? 'Prix non renseigné',
+      title,
+      price,
       image:
-        item.image ||
-        item.images?.[0] ||
-        'https://placehold.co/600x400?text=Annonce',
-      category: item.category ?? 'Catégories',
-      condition: item.condition,
-    }));
+        image,
+      category,
+      condition,
+      };
+    });
   } catch {
     return [];
   }

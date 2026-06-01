@@ -48,6 +48,17 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+function readInitialDraft(convId: string): string {
+  try {
+    const saved = sessionStorage.getItem(draftStorageKey(convId));
+    if (saved !== null) return saved;
+    sessionStorage.setItem(draftStorageKey(convId), DEFAULT_FIRST_MESSAGE_DRAFT);
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_FIRST_MESSAGE_DRAFT;
+}
+
 function ConversationDetailPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -59,9 +70,10 @@ function ConversationDetailPageContent() {
     return searchParams.get('id')?.trim() ?? '';
   }, [idFromParams, searchParams]);
   const { currentUser, hydrated } = useAuth();
-
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [text, setText] = useState('');
+  const conversation: Conversation | null = currentUser
+    ? getConversationById(id, currentUser.id)
+    : null;
+  const [text, setText] = useState(() => readInitialDraft(id || 'conv'));
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
@@ -89,22 +101,6 @@ function ConversationDetailPageContent() {
     }
   }, []);
 
-  const loadConversation = () => {
-    if (!currentUser) return;
-    setConversation(getConversationById(id, currentUser.id));
-  };
-
-  useEffect(() => {
-    if (!currentUser) return;
-    loadConversation();
-  }, [id, currentUser]);
-
-  useEffect(() => {
-    setText('');
-    setPendingVoice(null);
-    setVoiceError(null);
-  }, [id]);
-
   useEffect(() => {
     return () => {
       clearRecordTimer();
@@ -116,37 +112,6 @@ function ConversationDetailPageContent() {
       stopStream();
     };
   }, [clearRecordTimer, stopStream]);
-
-  const messageCount = useMemo(() => {
-    if (!conversation || conversation.id !== id) return -1;
-    return conversation.messages.length;
-  }, [conversation, id]);
-
-  useEffect(() => {
-    if (messageCount > 0) {
-      try {
-        sessionStorage.removeItem(draftStorageKey(id));
-      } catch {
-        /* ignore */
-      }
-      setText('');
-      return;
-    }
-
-    if (messageCount !== 0) return;
-
-    try {
-      const saved = sessionStorage.getItem(draftStorageKey(id));
-      if (saved !== null) {
-        setText(saved);
-      } else {
-        setText(DEFAULT_FIRST_MESSAGE_DRAFT);
-        sessionStorage.setItem(draftStorageKey(id), DEFAULT_FIRST_MESSAGE_DRAFT);
-      }
-    } catch {
-      setText(DEFAULT_FIRST_MESSAGE_DRAFT);
-    }
-  }, [id, messageCount]);
 
   const messages = useMemo(() => {
     return conversation?.messages ?? [];
@@ -292,7 +257,6 @@ function ConversationDetailPageContent() {
     });
 
     setPendingVoice(null);
-    loadConversation();
   };
 
   const handleSend = (e: React.FormEvent) => {
@@ -318,7 +282,6 @@ function ConversationDetailPageContent() {
       /* ignore */
     }
     setText('');
-    loadConversation();
   };
 
   if (hydrated && !currentUser) {

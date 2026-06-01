@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -676,6 +677,11 @@ function AnnonceDetailPageContent() {
                   Vendu
                 </span>
               )}
+              {product.status === 'reserved' && (
+                <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+                  Réservée
+                </span>
+              )}
             </div>
           </div>
 
@@ -687,9 +693,11 @@ function AnnonceDetailPageContent() {
                 onClick={() => openGalleryAt(selectedImage || productImages[0])}
                 className="block w-full"
               >
-                <img
+                <Image
                   src={selectedImage || productImages[0]}
                   alt={product.title}
+                  width={1400}
+                  height={900}
                   className="h-[260px] w-full cursor-zoom-in object-cover md:h-[360px]"
                 />
               </button>
@@ -820,8 +828,10 @@ function AnnonceDetailPageContent() {
                       : 'border-gray-200'
                   }`}
                 >
-                  <img
+                  <Image
                     src={img}
+                    width={80}
+                    height={64}
                     className="h-16 w-20 object-cover"
                     alt=""
                   />
@@ -1006,9 +1016,11 @@ function AnnonceDetailPageContent() {
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <img
+            <Image
               src={selectedImage || productImages[0]}
               alt={product.title}
+              width={1600}
+              height={1200}
               className="max-h-[85vh] max-w-[96vw] object-contain"
             />
           </div>

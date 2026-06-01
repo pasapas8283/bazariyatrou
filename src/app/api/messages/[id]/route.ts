@@ -4,8 +4,6 @@ import { ensureIdParams } from '../../../../lib/static-export-params';
 
 type Params = { params: Promise<{ id: string }> };
 
-export const dynamic = 'force-dynamic';
-
 export async function generateStaticParams() {
   const db = await readDb();
   return ensureIdParams(db.conversations.map((c) => ({ id: c.id })));

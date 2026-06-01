@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import {
@@ -38,6 +39,7 @@ import {
   getSortedCitiesByIsland,
   ISLAND_OPTIONS,
 } from '../../../../lib/comoros-locations';
+import { apiFetch } from '@/lib/api-origin';
 
 function splitLocation(location: string) {
   const [city = 'Ville', island = 'Île'] = location.split(',').map((v) => v.trim());
@@ -289,7 +291,7 @@ export default function ModifierAnnoncePage() {
     };
 
     try {
-      const response = await fetch(`/api/listings/${item.id}`, {
+      const response = await apiFetch(`/api/listings/${item.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -698,9 +700,11 @@ export default function ModifierAnnoncePage() {
                       className="col-span-2 flex items-center justify-center gap-3"
                     >
                       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
-                        <img
+                        <Image
                           src={img}
                           alt=""
+                          fill
+                          sizes="80px"
                           className="h-full w-full object-cover"
                         />
                       </div>

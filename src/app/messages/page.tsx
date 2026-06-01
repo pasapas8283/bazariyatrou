@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import BottomNav from '@/components/BottomNav';
@@ -15,26 +15,10 @@ import { useAuth } from '../../hooks/use-auth';
 export default function MessagesPage() {
   const router = useRouter();
   const { currentUser, hydrated } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-
-  const loadConversations = () => {
-    if (!currentUser) return;
-    setConversations(readConversations(currentUser.id));
-  };
-
-  useEffect(() => {
-    if (!hydrated) return;
-    if (!currentUser) return;
-
-    loadConversations();
-
-    const onFocus = () => loadConversations();
-    window.addEventListener('focus', onFocus);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [hydrated, currentUser]);
+  const conversations = useMemo<Conversation[]>(
+    () => (currentUser ? readConversations(currentUser.id) : []),
+    [currentUser]
+  );
 
   if (hydrated && !currentUser) {
     router.replace('/connexion');

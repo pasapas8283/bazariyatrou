@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -26,19 +25,18 @@ export function DisplayCurrencyProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [displayCurrency, setDisplayCurrencyState] =
-    useState<PriceCurrency>('KMF');
-
-  useEffect(() => {
+  const [displayCurrency, setDisplayCurrencyState] = useState<PriceCurrency>(() => {
+    if (typeof window === 'undefined') return 'KMF';
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw === 'EUR' || raw === 'KMF') {
-        setDisplayCurrencyState(raw);
+        return raw;
       }
     } catch {
       /* ignore */
     }
-  }, []);
+    return 'KMF';
+  });
 
   const setDisplayCurrency = useCallback((c: PriceCurrency) => {
     setDisplayCurrencyState(c);

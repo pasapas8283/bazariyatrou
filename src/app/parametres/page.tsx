@@ -44,14 +44,12 @@ function Toggle({
 export default function ParametresPage() {
   const router = useRouter();
   const { currentUser, hydrated } = useAuth();
-  const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  const [settings, setSettings] = useState<PlatformSettings | null>(() =>
+    readPlatformSettings()
+  );
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  useEffect(() => {
-    setSettings(readPlatformSettings());
-  }, []);
 
   useEffect(() => {
     if (hydrated && !currentUser) router.replace('/connexion');

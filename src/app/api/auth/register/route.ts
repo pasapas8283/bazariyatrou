@@ -3,8 +3,6 @@ import { hashPasswordServer } from '../../../../server/security';
 import { readDb, writeDb } from '../../../../server/db';
 import { applySessionCookie } from '../../../../server/auth-session';
 
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();

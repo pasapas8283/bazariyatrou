@@ -9,12 +9,10 @@ import { getCurrentUser, logoutUser, type AuthUser } from '../lib/auth-storage';
 export default function Navbar() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() =>
+    getCurrentUser()
+  );
   const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setCurrentUser(getCurrentUser());
-  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;

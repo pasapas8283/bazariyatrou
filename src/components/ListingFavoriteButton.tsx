@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   readFavorites,
   toggleFavoriteItem,
   type FavoriteItem,
 } from '../lib/favorites-storage';
+import { apiFetch } from '@/lib/api-origin';
 
 type ListingFavoriteButtonProps = {
   id: string;
@@ -30,15 +31,10 @@ export default function ListingFavoriteButton({
   condition,
   className = '',
 }: ListingFavoriteButtonProps) {
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(() =>
+    readFavorites().some((item) => item.id === id || item.title === title)
+  );
   const lastTouchToggleAt = useRef(0);
-
-  useEffect(() => {
-    const favorites = readFavorites();
-    setIsFavorite(
-      favorites.some((item) => item.id === id || item.title === title)
-    );
-  }, [id, title]);
 
   const performToggle = useCallback(() => {
     const payload: FavoriteItem = {
@@ -52,7 +48,7 @@ export default function ListingFavoriteButton({
     const nowFavorite = toggleFavoriteItem(payload);
     setIsFavorite(nowFavorite);
 
-    void fetch(`/api/listings/${encodeURIComponent(id)}/favorite`, {
+    void apiFetch(`/api/listings/${encodeURIComponent(id)}/favorite`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: nowFavorite ? 'add' : 'remove' }),

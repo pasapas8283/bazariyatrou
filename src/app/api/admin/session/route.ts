@@ -1,8 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
 const ADMIN_COOKIE = 'bzy_admin_session';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'BZR-admin-2026';
 

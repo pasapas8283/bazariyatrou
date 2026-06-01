@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getSortedCitiesByIsland,
@@ -259,9 +260,11 @@ export default function SearchBar({
       {showImageSearchRow && (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-green-200 bg-green-50/80 px-3 py-2 text-xs text-gray-800 sm:text-sm">
           {previewUrl && (
-            <img
+            <Image
               src={previewUrl}
               alt=""
+              width={40}
+              height={40}
               className="h-10 w-10 rounded-lg border border-gray-200 object-cover"
             />
           )}

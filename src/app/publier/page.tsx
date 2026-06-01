@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '../../hooks/use-auth';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -41,6 +42,7 @@ import {
   writeMarketplaceItems,
 } from '../../lib/marketplace-storage';
 import { readPlatformSettings } from '../../lib/platform-settings-storage';
+import { apiFetch } from '@/lib/api-origin';
 
 function PublishFormSection({
   title,
@@ -314,17 +316,36 @@ export default function PublierPage() {
 
     let created: MarketplaceItem | null = null;
     let publishedLocally = false;
-    try {
-      const response = await fetch('/api/listings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem),
-      });
-      if (!response.ok) throw new Error('create failed');
-      const data = await response.json();
-      created = normalizeItem(data?.item ?? newItem);
-    } catch {
-      // APK statique / hors backend: on garde un fallback local pour publier quand même.
+    let lastResponseStatus: number | null = null;
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const response = await apiFetch('/api/listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem),
+        });
+        lastResponseStatus = response.status;
+        if (!response.ok) {
+          const transient = response.status === 502 || response.status === 503;
+          if (transient && attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
+            continue;
+          }
+          throw new Error('create failed');
+        }
+        const data = await response.json();
+        created = normalizeItem(data?.item ?? newItem);
+        break;
+      } catch {
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
+          continue;
+        }
+      }
+    }
+    if (!created) {
+      // APK statique / backend temporairement indisponible: fallback local.
       created = normalizeItem(newItem);
       publishedLocally = true;
     }
@@ -340,7 +361,9 @@ export default function PublierPage() {
 
     alert(
       publishedLocally
-        ? 'Annonce publiée localement (serveur indisponible).'
+        ? `Annonce publiée localement (serveur indisponible${
+            lastResponseStatus ? `, code ${lastResponseStatus}` : ''
+          }).`
         : 'Annonce publiée avec succès !'
     );
 
@@ -907,9 +930,11 @@ export default function PublierPage() {
                       className="col-span-2 flex items-center justify-center gap-3"
                     >
                       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
-                        <img
+                        <Image
                           src={img}
                           alt=""
+                          fill
+                          sizes="80px"
                           className="h-full w-full object-cover"
                         />
                       </div>

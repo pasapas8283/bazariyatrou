@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback } from 'react';
 
 const VERSION = '20260413a';
@@ -40,9 +41,11 @@ export default function SiteBrandLogo({
   }, []);
 
   return (
-    <img
+    <Image
       src={`${LOGO_CANDIDATES[0]}?v=${VERSION}`}
       alt={alt}
+      width={240}
+      height={72}
       className={className}
       onError={onError}
     />

@@ -29,6 +29,13 @@ export type Conversation = {
 
 export const CONVERSATIONS_STORAGE_KEY = 'bazariyatrou-conversations';
 
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  if (value && typeof value === 'object') return value as UnknownRecord;
+  return {};
+}
+
 export function readConversations(ownerUserId?: string): Conversation[] {
   if (typeof window === 'undefined') return [];
 
@@ -38,27 +45,45 @@ export function readConversations(ownerUserId?: string): Conversation[] {
 
     if (!Array.isArray(parsed)) return [];
 
-    const normalized = parsed.map((conv: any) => ({
-      id: String(conv.id ?? `conv-${Date.now()}`),
-      ownerUserId: String(conv.ownerUserId ?? conv.userId ?? ''),
-      itemId: String(conv.itemId ?? conv.productSlug ?? ''),
-      sellerName: conv.sellerName ?? 'Vendeur',
-      productTitle: conv.productTitle ?? 'Annonce',
-      messages: Array.isArray(conv.messages)
-        ? conv.messages.map((msg: any) => ({
-            id: String(msg.id ?? `msg-${Date.now()}`),
-            sender: msg.sender === 'me' ? 'me' : 'other',
-            text: typeof msg.text === 'string' ? msg.text : '',
-            time: msg.time ?? '',
-            voiceDataUrl:
-              typeof msg.voiceDataUrl === 'string' ? msg.voiceDataUrl : undefined,
-            voiceDurationSec:
-              typeof msg.voiceDurationSec === 'number'
-                ? msg.voiceDurationSec
-                : undefined,
-          }))
-        : [],
-    }));
+    const normalized: Conversation[] = parsed.map((convValue: unknown) => {
+      const conv = asRecord(convValue);
+      const sellerName =
+        typeof conv.sellerName === 'string' && conv.sellerName.trim() !== ''
+          ? conv.sellerName
+          : 'Vendeur';
+      const productTitle =
+        typeof conv.productTitle === 'string' && conv.productTitle.trim() !== ''
+          ? conv.productTitle
+          : 'Annonce';
+      return {
+        id: String(conv.id ?? `conv-${Date.now()}`),
+        ownerUserId: String(conv.ownerUserId ?? conv.userId ?? ''),
+        itemId: String(conv.itemId ?? conv.productSlug ?? ''),
+        sellerName,
+        productTitle,
+        messages: Array.isArray(conv.messages)
+          ? conv.messages.map((msgValue: unknown): ConversationMessage => {
+              const msg = asRecord(msgValue);
+              const sender: MessageSender =
+                msg.sender === 'me' ? 'me' : 'other';
+              return {
+                id: String(msg.id ?? `msg-${Date.now()}`),
+                sender,
+                text: typeof msg.text === 'string' ? msg.text : '',
+                time: typeof msg.time === 'string' ? msg.time : '',
+                voiceDataUrl:
+                  typeof msg.voiceDataUrl === 'string'
+                    ? msg.voiceDataUrl
+                    : undefined,
+                voiceDurationSec:
+                  typeof msg.voiceDurationSec === 'number'
+                    ? msg.voiceDurationSec
+                    : undefined,
+              };
+            })
+          : [],
+      };
+    });
 
     if (!ownerUserId) return normalized;
     return normalized.filter((conv) => conv.ownerUserId === ownerUserId);

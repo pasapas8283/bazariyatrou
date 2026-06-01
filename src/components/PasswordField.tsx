@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 type PasswordFieldProps = {
   id?: string;
@@ -66,16 +66,13 @@ export default function PasswordField({
 }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
   const hasValue = value.trim().length > 0;
-
-  useEffect(() => {
-    if (!value.trim()) setVisible(false);
-  }, [value]);
+  const visibleWhenAllowed = visible && hasValue;
 
   return (
     <div className="relative">
       <input
         id={id}
-        type={visible ? 'text' : 'password'}
+        type={visibleWhenAllowed ? 'text' : 'password'}
         placeholder={placeholder}
         value={value}
         onChange={onChange}
@@ -88,10 +85,12 @@ export default function PasswordField({
           onClick={() => setVisible((v) => !v)}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-100"
           aria-label={
-            visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'
+            visibleWhenAllowed
+              ? 'Masquer le mot de passe'
+              : 'Afficher le mot de passe'
           }
         >
-          {visible ? (
+          {visibleWhenAllowed ? (
             <EyeSlashIcon className="h-5 w-5" />
           ) : (
             <EyeIcon className="h-5 w-5" />

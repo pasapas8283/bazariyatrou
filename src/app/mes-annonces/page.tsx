@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import BottomNav from '@/components/BottomNav';
@@ -15,13 +16,48 @@ import {
 } from '../../lib/marketplace-formatters';
 import { useAuth } from '../../hooks/use-auth';
 
+function formatReservedUntil(value: string | undefined): string | null {
+  if (!value) return null;
+  const dt = new Date(value);
+  if (!Number.isFinite(dt.getTime())) return null;
+  return dt.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatRemaining(value: string | undefined, nowMs: number): string | null {
+  if (!value) return null;
+  const untilMs = new Date(value).getTime();
+  if (!Number.isFinite(untilMs)) return null;
+  const diffMs = untilMs - nowMs;
+  if (diffMs <= 0) return '00:00:00';
+  const totalSec = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const h = String(hours).padStart(2, '0');
+  const m = String(minutes).padStart(2, '0');
+  const s = String(seconds).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 function MesAnnoncesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser, hydrated: authHydrated } = useAuth();
   const { myItems, hydrated, deleteItem, updateItemStatus } =
     useMarketplaceItems();
+  const [nowTs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const wasDeleted = searchParams.get('deleted') === '1';
+
+  useEffect(() => {
+    const intervalId = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleDelete = (id: string, title: string) => {
     const confirmed = window.confirm(
@@ -35,9 +71,16 @@ function MesAnnoncesPageContent() {
 
   const handleToggleStatus = (
     id: string,
-    currentStatus: 'available' | 'sold'
+    currentStatus: 'available' | 'reserved' | 'sold'
   ) => {
     updateItemStatus(id, currentStatus === 'sold' ? 'available' : 'sold');
+  };
+
+  const handleReserveStatus = (
+    id: string,
+    currentStatus: 'available' | 'reserved' | 'sold'
+  ) => {
+    updateItemStatus(id, currentStatus === 'reserved' ? 'available' : 'reserved');
   };
 
   if (authHydrated && !currentUser) {
@@ -102,12 +145,14 @@ function MesAnnoncesPageContent() {
                     className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm"
                   >
                     <div className="relative">
-                      <img
+                      <Image
                         src={
                           item.images?.[0] ||
                           'https://placehold.co/600x400?text=Annonce'
                         }
                         alt={item.title}
+                        width={600}
+                        height={400}
                         className="h-40 w-full object-cover"
                       />
 
@@ -123,7 +168,7 @@ function MesAnnoncesPageContent() {
                         )}
                         {item.isFeatured === true &&
                           typeof item.featuredUntil === 'string' &&
-                          new Date(item.featuredUntil).getTime() > Date.now() && (
+                          new Date(item.featuredUntil).getTime() > nowTs && (
                             <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-800 shadow-sm">
                               Boostée
                             </span>
@@ -133,6 +178,11 @@ function MesAnnoncesPageContent() {
                       {item.status === 'sold' && (
                         <span className="absolute right-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
                           Vendu
+                        </span>
+                      )}
+                      {item.status === 'reserved' && (
+                        <span className="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                          Réservée
                         </span>
                       )}
                     </div>
@@ -150,6 +200,15 @@ function MesAnnoncesPageContent() {
                           <p className="mt-1 text-sm text-gray-500">
                             {item.location}
                           </p>
+                          {item.status === 'reserved' && (
+                            <p className="mt-1 text-xs font-semibold text-orange-700">
+                              Compte à rebours :{' '}
+                              {formatRemaining(item.reservedUntil, nowMs) ??
+                                '24:00:00'}
+                              {' · '}jusqu&apos;au{' '}
+                              {formatReservedUntil(item.reservedUntil) ?? '--'}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -186,6 +245,18 @@ function MesAnnoncesPageContent() {
     className="rounded-2xl bg-yellow-100 py-3 text-center text-sm font-semibold text-yellow-800"
   >
     Booster
+  </button>
+
+  <button
+    type="button"
+    onClick={() => handleReserveStatus(item.id, item.status)}
+    className={`rounded-2xl py-3 text-sm font-semibold ${
+      item.status === 'reserved'
+        ? 'bg-orange-100 text-orange-700'
+        : 'bg-orange-50 text-orange-700'
+    }`}
+  >
+    {item.status === 'reserved' ? 'Réservation ON' : 'Réserver'}
   </button>
 
   <button

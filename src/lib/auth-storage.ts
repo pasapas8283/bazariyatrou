@@ -1,3 +1,5 @@
+import { apiFetch } from './api-origin';
+
 export type AuthUser = {
   id: string;
   firstName: string;
@@ -158,7 +160,7 @@ export function logoutUser() {
     currentUser: null,
   });
   if (typeof window !== 'undefined') {
-    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }
 }
 

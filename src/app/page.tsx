@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import SearchBar from '@/components/SearchBar';
@@ -22,7 +22,7 @@ import { matchesLocationFilter } from '../lib/comoros-locations';
 import { listingMatchesSearchQuery } from '../lib/listing-text-search';
 import { useDisplayCurrency } from '../contexts/display-currency-context';
 import DisplayCurrencyToggle from '@/components/DisplayCurrencyToggle';
-import type { PriceCurrency } from '../types/marketplace';
+import type { MarketplaceItem, PriceCurrency } from '../types/marketplace';
 
 type HomeCardItem = {
   id: string;
@@ -36,7 +36,11 @@ type HomeCardItem = {
   sellerType?: 'standard' | 'pro';
 };
 
-function toHomeCardItem(item: any, displayCurrency: PriceCurrency): HomeCardItem {
+function toHomeCardItem(
+  item: MarketplaceItem,
+  displayCurrency: PriceCurrency,
+  nowTs: number
+): HomeCardItem {
   return {
     id: item.id,
     title: item.title,
@@ -56,7 +60,7 @@ function toHomeCardItem(item: any, displayCurrency: PriceCurrency): HomeCardItem
     isFeatured:
       item.isFeatured === true &&
       typeof item.featuredUntil === 'string' &&
-      new Date(item.featuredUntil).getTime() > Date.now(),
+      new Date(item.featuredUntil).getTime() > nowTs,
     sellerType: item.sellerType === 'pro' ? 'pro' : 'standard',
   };
 }
@@ -65,37 +69,31 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const { items } = useMarketplaceItems();
   const { displayCurrency } = useDisplayCurrency();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => (searchParams.get('q') ?? '').trim());
   const [category, setCategory] = useState('Tous');
   const [island, setIsland] = useState('');
   const [city, setCity] = useState('');
+  const [nowTs] = useState(() => Date.now());
   const [imageSearchMatchIds, setImageSearchMatchIds] = useState<
     string[] | null
   >(null);
 
-  useEffect(() => {
-    const q = (searchParams.get('q') ?? '').trim();
-    if (!q) return;
-    setQuery((prev) => prev || q);
-  }, [searchParams]);
-
   const imageSearchCandidates = useMemo(
     () =>
       items
-        .filter((item) => item.status === 'available')
+        .filter((item) => item.status !== 'sold')
         .map((item) => ({ id: item.id, images: item.images })),
     [items]
   );
 
   const filteredItems = useMemo(() => {
-    const now = Date.now();
-    const isBoostActive = (item: any) =>
+    const isBoostActive = (item: MarketplaceItem) =>
       item.isFeatured === true &&
       typeof item.featuredUntil === 'string' &&
-      new Date(item.featuredUntil).getTime() > now;
+      new Date(item.featuredUntil).getTime() > nowTs;
 
     return items
-      .filter((item) => item.status === 'available')
+      .filter((item) => item.status !== 'sold')
       .filter((item) => {
         const matchSearch = listingMatchesSearchQuery(item, query);
 
@@ -127,7 +125,7 @@ function HomePageContent() {
         if (aBoost !== bBoost) return aBoost ? -1 : 1;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       })
-      .map((item) => toHomeCardItem(item, displayCurrency));
+      .map((item) => toHomeCardItem(item, displayCurrency, nowTs));
   }, [
     items,
     query,
@@ -136,6 +134,7 @@ function HomePageContent() {
     city,
     displayCurrency,
     imageSearchMatchIds,
+    nowTs,
   ]);
 
   return (

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import ListingFavoriteButton from './ListingFavoriteButton';
 import { getConditionBadgeClass } from '../lib/marketplace-conditions';
@@ -49,9 +50,11 @@ export default function ListingCard({
     >
       <article className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md">
         <div className="relative">
-          <img
+          <Image
             src={image || 'https://placehold.co/600x400?text=Annonce'}
             alt={title}
+            width={600}
+            height={400}
             className="h-32 w-full object-cover"
           />
 

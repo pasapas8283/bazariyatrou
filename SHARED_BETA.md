@@ -35,7 +35,7 @@ SUPABASE_STATE_TABLE=app_state
 
 ```bash
 npm install
-npm run build
+npm run build:render
 npm run start:shared
 ```
 
@@ -44,9 +44,10 @@ npm run start:shared
 Exigences:
 
 - Service Node.js
-- Commande build (Render / CI): `npm ci --include=dev && npm run build`  
-  (ou `npm install && npm run build` si pas de `package-lock.json`)
-- Commande start (mode standalone): `npm run start:shared`
+- Commande build (Render / CI): `npm ci --include=dev && npm run build:render`  
+  (ou `npm install && npm run build:render` si pas de `package-lock.json`)
+- Commande start (mode standalone): `npm run start:shared`  
+  (équivalent manuel Render : lancer `server.js` **depuis** `.next/standalone` avec `HOSTNAME=0.0.0.0`)
 - Port expose par la plateforme
 - Volume persistant monte sur `/data`
 

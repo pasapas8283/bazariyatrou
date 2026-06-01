@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import PasswordField from '@/components/PasswordField';
+import { apiFetch } from '@/lib/api-origin';
 
 function AdminLoginPageContent() {
   const router = useRouter();
@@ -17,7 +18,7 @@ function AdminLoginPageContent() {
     if (!password.trim()) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/session', {
+      const res = await apiFetch('/api/admin/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),

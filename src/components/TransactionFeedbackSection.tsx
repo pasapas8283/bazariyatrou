@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/use-auth';
+import { apiFetch } from '@/lib/api-origin';
 import type { MarketplaceItem } from '../types/marketplace';
 import type { TransactionFeedbackEntry } from '../types/transaction-feedback';
 
@@ -31,7 +32,7 @@ export default function TransactionFeedbackSection({
     }
     setLoading(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/listings/${encodeURIComponent(listing.id)}/feedback`,
         { cache: 'no-store' }
       );
@@ -74,7 +75,7 @@ export default function TransactionFeedbackSection({
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/listings/${encodeURIComponent(listing.id)}/feedback`,
         {
           method: 'POST',
@@ -111,7 +112,7 @@ export default function TransactionFeedbackSection({
     setClaiming(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/listings/${encodeURIComponent(listing.id)}`,
         {
           method: 'PATCH',

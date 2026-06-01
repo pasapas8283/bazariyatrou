@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ressource par défaut pour @drawable/splash (évite MissingDefaultResource au lint).
+     Les variantes land/port en densité restent dans drawable-*-*. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+</layer-list>

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMarketplaceItems } from '../../hooks/use-marketplace-items';
@@ -46,6 +46,7 @@ export default function AnnoncesPage() {
   const router = useRouter();
   const { availableItems, hydrated } = useMarketplaceItems();
   const { displayCurrency } = useDisplayCurrency();
+  const [nowTs] = useState(() => Date.now());
   const [filters, setFilters] = useState<ItemFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -223,12 +224,14 @@ export default function AnnoncesPage() {
                 }}
               >
                 <div className="relative aspect-[4/3] w-full bg-gray-100">
-                  <img
+                  <Image
                     src={
                       item.images?.[0] ||
                       'https://placehold.co/600x400?text=Annonce'
                     }
                     alt={item.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="h-full w-full object-cover"
                   />
 
@@ -237,10 +240,15 @@ export default function AnnoncesPage() {
                       Vendu
                     </span>
                   )}
+                  {item.status === 'reserved' && (
+                    <span className="absolute left-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">
+                      Réservée
+                    </span>
+                  )}
 
                   {item.isFeatured === true &&
                     typeof item.featuredUntil === 'string' &&
-                    new Date(item.featuredUntil).getTime() > Date.now() && (
+                    new Date(item.featuredUntil).getTime() > nowTs && (
                       <span className="absolute right-3 top-3 rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
                         Boostée
                       </span>

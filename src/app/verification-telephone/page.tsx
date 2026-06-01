@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import { useAuth } from '../../hooks/use-auth';
