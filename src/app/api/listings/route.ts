@@ -20,7 +20,23 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Corps JSON invalide ou trop volumineux.' },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: 'Format d’annonce invalide.' },
+        { status: 400 }
+      );
+    }
+
     const item = normalizeItem(body);
     const db = await readDb();
     const withoutSameId = db.listings.filter((entry) => entry.id !== item.id);
@@ -30,10 +46,14 @@ export async function POST(request: Request) {
     };
     await writeDb(next);
     return NextResponse.json({ item }, { status: 201 });
-  } catch {
-    return NextResponse.json(
-      { error: 'Impossible de créer l’annonce.' },
-      { status: 400 }
-    );
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de créer l’annonce.';
+    const status = /supabase|db|write|ENOSPC|EACCES/i.test(message)
+      ? 503
+      : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -29,7 +29,8 @@ export function mergeListingImages(a: string[], b: string[]): string[] {
   return a.length > 0 ? a : b;
 }
 
-const MAX_API_IMAGE_CHARS = 280_000;
+const MAX_API_IMAGE_CHARS = 80_000;
+const MAX_API_IMAGES = 2;
 
 /** Compresse une data URL pour tenir dans l’API (autres téléphones). */
 export async function compressListingImageForApi(
@@ -62,13 +63,24 @@ export async function compressListingImageForApi(
         return;
       }
       ctx.drawImage(img, 0, 0, w, h);
-      let quality = 0.82;
+      let quality = 0.72;
       let out = canvas.toDataURL('image/jpeg', quality);
-      while (out.length > maxChars && quality > 0.4) {
+      while (out.length > maxChars && quality > 0.28) {
         quality -= 0.08;
         out = canvas.toDataURL('image/jpeg', quality);
       }
-      resolve(out.length <= maxChars ? out : dataUrl.slice(0, maxChars));
+      if (out.length > maxChars) {
+        const scale = Math.sqrt(maxChars / out.length);
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        out = canvas.toDataURL('image/jpeg', 0.55);
+      }
+      resolve(
+        out.length <= maxChars
+          ? out
+          : 'https://placehold.co/600x400?text=Photo'
+      );
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
@@ -78,12 +90,12 @@ export async function compressListingImageForApi(
 export async function prepareListingImagesForApi(
   images: string[]
 ): Promise<string[]> {
-  const cleaned = images.map((img) => img.trim()).filter(Boolean);
+  const cleaned = images.map((img) => img.trim()).filter(Boolean).slice(0, MAX_API_IMAGES);
   const prepared: string[] = [];
   for (const img of cleaned) {
     if (img.startsWith('data:image/')) {
       prepared.push(await compressListingImageForApi(img));
-    } else {
+    } else if (!img.startsWith('blob:')) {
       prepared.push(img);
     }
   }

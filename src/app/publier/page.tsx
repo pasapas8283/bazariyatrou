@@ -333,6 +333,7 @@ export default function PublierPage() {
     let created: MarketplaceItem | null = null;
     let publishedLocally = false;
     let lastResponseStatus: number | null = null;
+    let lastServerError = '';
     const apiImages = await prepareListingImagesForApi(newItem.images);
     const itemForApi: MarketplaceItem = { ...newItem, images: apiImages };
     const maxAttempts = 3;
@@ -345,6 +346,12 @@ export default function PublierPage() {
         });
         lastResponseStatus = response.status;
         if (!response.ok) {
+          try {
+            const errJson = (await response.json()) as { error?: string };
+            if (errJson?.error) lastServerError = String(errJson.error);
+          } catch {
+            /* ignore */
+          }
           const transient = response.status === 502 || response.status === 503;
           if (transient && attempt < maxAttempts) {
             await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
@@ -361,7 +368,7 @@ export default function PublierPage() {
         });
         break;
       } catch {
-        if (attempt < maxAttempts) {
+        if (attempt < maxAttempts && (lastResponseStatus === 502 || lastResponseStatus === 503 || lastResponseStatus == null)) {
           await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
           continue;
         }
@@ -391,7 +398,7 @@ export default function PublierPage() {
       publishedLocally
         ? `Annonce publiée localement (serveur indisponible${
             lastResponseStatus ? `, code ${lastResponseStatus}` : ''
-          }).`
+          }${lastServerError ? ` — ${lastServerError}` : ''}).`
         : 'Annonce publiée avec succès !'
     );
 

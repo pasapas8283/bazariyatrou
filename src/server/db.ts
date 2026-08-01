@@ -105,6 +105,55 @@ async function readSupabaseDb(): Promise<DbShape> {
   return normalizeDbShape(rows[0]?.data);
 }
 
+const PLACEHOLDER_IMAGE = 'https://placehold.co/600x400?text=Annonce';
+/** Limite stricte : tout l’état vit dans une seule ligne Supabase. */
+const MAX_STORED_DATA_URL_CHARS = 60_000;
+
+function leanImagesForStorage(images: string[] | undefined): string[] {
+  const cleaned = (images ?? [])
+    .map((img) => (typeof img === 'string' ? img.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((img) => {
+      if (img.startsWith('blob:')) return PLACEHOLDER_IMAGE;
+      if (img.startsWith('data:') && img.length > MAX_STORED_DATA_URL_CHARS) {
+        return PLACEHOLDER_IMAGE;
+      }
+      return img;
+    })
+    // Une seule data URL max par annonce pour éviter le 400 PostgREST.
+    .reduce<string[]>((acc, img) => {
+      if (img.startsWith('data:') && acc.some((x) => x.startsWith('data:'))) {
+        return acc;
+      }
+      acc.push(img);
+      return acc;
+    }, []);
+
+  return cleaned.length > 0 ? cleaned : [PLACEHOLDER_IMAGE];
+}
+
+/** Réduit le JSON avant écriture (évite code 400 / payload trop gros). */
+function leanDbForStorage(db: DbShape): DbShape {
+  return {
+    users: db.users.map((user) => ({
+      ...user,
+      avatar:
+        typeof user.avatar === 'string' &&
+        user.avatar.startsWith('data:') &&
+        user.avatar.length > 20_000
+          ? undefined
+          : user.avatar,
+    })),
+    listings: db.listings.map((item) => ({
+      ...item,
+      images: leanImagesForStorage(item.images),
+    })),
+    conversations: db.conversations,
+    transactionFeedback: db.transactionFeedback,
+  };
+}
+
 async function writeSupabaseDb(next: DbShape) {
   const baseUrl = SUPABASE_URL as string;
   const serviceRoleKey = SUPABASE_SERVICE_ROLE_KEY as string;
@@ -112,6 +161,7 @@ async function writeSupabaseDb(next: DbShape) {
     SUPABASE_TABLE
   )}?on_conflict=id`;
 
+  const payload = leanDbForStorage(next);
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -120,11 +170,16 @@ async function writeSupabaseDb(next: DbShape) {
       Authorization: `Bearer ${serviceRoleKey}`,
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify([{ id: SUPABASE_STATE_ID, data: next }]),
+    body: JSON.stringify([{ id: SUPABASE_STATE_ID, data: payload }]),
   });
 
   if (!res.ok) {
-    throw new Error(`Supabase write failed (${res.status})`);
+    const detail = await res.text().catch(() => '');
+    throw new Error(
+      `Supabase write failed (${res.status})${
+        detail ? `: ${detail.slice(0, 180)}` : ''
+      }`
+    );
   }
 }
 
@@ -150,11 +205,33 @@ export async function readDb(): Promise<DbShape> {
 }
 
 export async function writeDb(next: DbShape) {
+  const payload = leanDbForStorage(next);
   if (isSupabaseEnabled()) {
-    await writeSupabaseDb(next);
-    return;
+    try {
+      await writeSupabaseDb(payload);
+      return;
+    } catch (firstError) {
+      // Dernier recours : annonces sans data URL (métadonnées partagées).
+      const stripped: DbShape = {
+        ...payload,
+        listings: payload.listings.map((item) => ({
+          ...item,
+          images: [PLACEHOLDER_IMAGE],
+        })),
+        users: payload.users.map((user) => ({
+          ...user,
+          avatar: user.avatar?.startsWith('data:') ? undefined : user.avatar,
+        })),
+      };
+      try {
+        await writeSupabaseDb(stripped);
+        return;
+      } catch {
+        throw firstError;
+      }
+    }
   }
 
   await ensureDbFile();
-  await fs.writeFile(activeDbFile, JSON.stringify(next, null, 2), 'utf-8');
+  await fs.writeFile(activeDbFile, JSON.stringify(payload, null, 2), 'utf-8');
 }
