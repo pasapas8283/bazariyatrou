@@ -2,13 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Fragment, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import MobileShell from '@/components/MobileShell';
 import {
-  readMarketplaceItems,
+  combineLocalListingSnapshots,
   writeMarketplaceItems,
 } from '../../../../lib/marketplace-storage';
+import { loadMergedMarketplaceItems } from '../../../../lib/listings-merge';
 import {
   HOUSE_SALE_LEVEL_OPTIONS,
   type HouseSaleLevel,
@@ -40,6 +41,10 @@ import {
   ISLAND_OPTIONS,
 } from '../../../../lib/comoros-locations';
 import { apiFetch } from '@/lib/api-origin';
+import {
+  mergeListingImages,
+  prepareListingImagesForApi,
+} from '@/lib/listing-images';
 
 function splitLocation(location: string) {
   const [city = 'Ville', island = 'Île'] = location.split(',').map((v) => v.trim());
@@ -61,12 +66,23 @@ function splitLocation(location: string) {
   };
 }
 
-export default function ModifierAnnoncePage() {
+export function ModifierAnnoncePageContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = useMemo(() => {
+    const fromQuery = searchParams.get('id')?.trim();
+    if (fromQuery) return fromQuery;
+    const raw = params.id;
+    if (Array.isArray(raw)) return raw[0] ?? '';
+    if (typeof raw === 'string' && raw && raw !== 'modifier') return raw;
+    return '';
+  }, [params.id, searchParams]);
 
   const [item, setItem] = useState<MarketplaceItem | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing'>(
+    'loading'
+  );
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -92,64 +108,98 @@ export default function ModifierAnnoncePage() {
     digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
   useEffect(() => {
-    const items = readMarketplaceItems();
-    const found = items.find((entry) => entry.id === id) ?? null;
+    let cancelled = false;
 
-    if (!found) return;
+    const hydrateForm = (found: MarketplaceItem) => {
+      const { city, island, customCity } = splitLocation(found.location);
+      setItem(found);
+      setTitle(found.title);
+      setDescription(found.description ?? '');
+      setPrice(String(found.price));
+      setPriceCurrency(found.priceCurrency ?? 'KMF');
+      const isTerrainImmobilier =
+        found.category === 'immobilier' &&
+        (found.terrainSetting ||
+          found.terrainAreaMode ||
+          found.terrainAreaM2 != null ||
+          found.terrainLengthM != null ||
+          found.terrainWidthM != null);
+      const isHouseImmobilier =
+        found.category === 'immobilier' &&
+        !isTerrainImmobilier &&
+        (found.houseAreaM2 != null ||
+          found.houseLengthM != null ||
+          found.houseRoomCount != null ||
+          found.houseLevels);
+      setCategory(
+        found.publishCategoryLabel?.trim() ||
+          (isHouseImmobilier ? 'Vente maison' : '') ||
+          (isTerrainImmobilier ? 'Terrain' : '') ||
+          getCategoryLabel(found.category)
+      );
+      setCondition(getConditionLabel(found.condition));
+      setSubCategory(found.subCategory ?? '');
+      setSubSubCategory(found.subSubCategory ?? '');
+      setIsland(island);
+      setCity(city);
+      setCustomCity(customCity);
+      const pub = (found.phone ?? '').trim();
+      const cp = (found.contactPhone ?? '').trim();
+      setPhone(found.phone ?? '');
+      setWhatsappPhone(cp && cp !== pub ? cp : '');
+      setImages(found.images?.length > 0 ? found.images : ['']);
+      setHouseAreaM2(found.houseAreaM2 ? String(found.houseAreaM2) : '');
+      setHouseLengthM(
+        found.houseLengthM != null ? String(found.houseLengthM) : ''
+      );
+      setHouseWidthM(found.houseWidthM != null ? String(found.houseWidthM) : '');
+      setHouseRoomCount(
+        found.houseRoomCount != null ? String(found.houseRoomCount) : ''
+      );
+      setHouseLevels(found.houseLevels ?? '');
+      setLoadState('ready');
+    };
 
-    const currentUser = getCurrentUser();
-    if (!currentUser || found.sellerId !== currentUser.id) {
-      alert("Vous n'avez pas l'autorisation de modifier cette annonce.");
-      router.push('/mes-annonces');
-      return;
-    }
+    const resolveListing = async () => {
+      setLoadState('loading');
+      if (!id) {
+        setLoadState('missing');
+        return;
+      }
+      const listingId = decodeURIComponent(id);
+      const localHit =
+        combineLocalListingSnapshots().find((entry) => entry.id === listingId) ??
+        null;
+      let found = localHit;
+      if (!found) {
+        try {
+          const merged = await loadMergedMarketplaceItems();
+          found = merged.find((entry) => entry.id === listingId) ?? null;
+        } catch {
+          found = null;
+        }
+      }
+      if (cancelled) return;
 
-    const { city, island, customCity } = splitLocation(found.location);
+      if (!found) {
+        setLoadState('missing');
+        return;
+      }
 
-    setItem(found);
-    setTitle(found.title);
-    setDescription(found.description ?? '');
-    setPrice(String(found.price));
-    const isTerrainImmobilier =
-      found.category === 'immobilier' &&
-      (found.terrainSetting ||
-        found.terrainAreaMode ||
-        found.terrainAreaM2 != null ||
-        found.terrainLengthM != null ||
-        found.terrainWidthM != null);
-    const isHouseImmobilier =
-      found.category === 'immobilier' &&
-      !isTerrainImmobilier &&
-      (found.houseAreaM2 != null ||
-        found.houseLengthM != null ||
-        found.houseRoomCount != null ||
-        found.houseLevels);
-    setCategory(
-      found.publishCategoryLabel?.trim() ||
-        (isHouseImmobilier ? 'Vente maison' : '') ||
-        (isTerrainImmobilier ? 'Terrain' : '') ||
-        getCategoryLabel(found.category)
-    );
-    setCondition(getConditionLabel(found.condition));
-    setSubCategory(found.subCategory ?? '');
-    setSubSubCategory(found.subSubCategory ?? '');
-    setIsland(island);
-    setCity(city);
-    setCustomCity(customCity);
-    const pub = (found.phone ?? '').trim();
-    const cp = (found.contactPhone ?? '').trim();
-    setPhone(found.phone ?? '');
-    setWhatsappPhone(cp && cp !== pub ? cp : '');
-    setImages(found.images?.length > 0 ? found.images : ['']);
-    setHouseAreaM2(found.houseAreaM2 ? String(found.houseAreaM2) : '');
-    setHouseLengthM(
-      found.houseLengthM != null ? String(found.houseLengthM) : ''
-    );
-    setHouseWidthM(found.houseWidthM != null ? String(found.houseWidthM) : '');
-    setHouseRoomCount(
-      found.houseRoomCount != null ? String(found.houseRoomCount) : ''
-    );
-    setHouseLevels(found.houseLevels ?? '');
+      const currentUser = getCurrentUser();
+      if (!currentUser || found.sellerId !== currentUser.id) {
+        alert("Vous n'avez pas l'autorisation de modifier cette annonce.");
+        router.replace('/mes-annonces');
+        return;
+      }
+
+      hydrateForm(found);
+    };
+
+    void resolveListing();
+    return () => {
+      cancelled = true;
+    };
   }, [id, router]);
 
   const updateImage = (index: number, value: string) => {
@@ -212,22 +262,31 @@ export default function ModifierAnnoncePage() {
     const hasHouseLevelsError =
       isHouseSaleCategory && !String(houseLevels).trim();
 
-    if (
-      hasTitleError ||
-      hasPriceError ||
-      hasCategoryError ||
-      hasSubCategoryError ||
-      hasSubSubCategoryError ||
-      hasConditionError ||
-      hasIslandError ||
-      hasCityError ||
-      hasCustomCityError ||
-      hasHouseAreaM2Error ||
-      hasHouseLengthError ||
-      hasHouseWidthError ||
-      hasHouseRoomCountError ||
-      hasHouseLevelsError
-    ) {
+    const missingFields: string[] = [];
+    if (hasTitleError) missingFields.push('titre');
+    if (hasPriceError) missingFields.push('prix');
+    if (hasCategoryError) missingFields.push('catégorie');
+    if (hasSubCategoryError) missingFields.push('sous-catégorie');
+    if (hasSubSubCategoryError) missingFields.push('sous-sous-catégorie');
+    if (hasConditionError) missingFields.push('état');
+    if (hasIslandError) missingFields.push('île');
+    if (hasCityError || hasCustomCityError) missingFields.push('ville');
+    if (hasHouseAreaM2Error) missingFields.push('surface maison');
+    if (hasHouseLengthError || hasHouseWidthError) {
+      missingFields.push('dimensions maison');
+    }
+    if (hasHouseRoomCountError) missingFields.push('nombre de pièces');
+    if (hasHouseLevelsError) missingFields.push('niveaux maison');
+
+    if (missingFields.length > 0) {
+      alert(
+        `Complète les champs obligatoires : ${missingFields.join(', ')}.`
+      );
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>('[data-publish-error="true"]')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
 
@@ -258,7 +317,7 @@ export default function ModifierAnnoncePage() {
     ).trim();
     const settings = readPlatformSettings();
 
-    const updates = {
+    const updates: Partial<MarketplaceItem> = {
       title: title.trim(),
       description: description.trim(),
       price: normalizePrice(price),
@@ -287,31 +346,87 @@ export default function ModifierAnnoncePage() {
         ? subSubCategory
         : undefined,
       houseAreaM2: isHouseSaleCategory ? Number(houseAreaM2) : undefined,
+      houseLengthM: isHouseSaleCategory ? Number(houseLengthM) : undefined,
+      houseWidthM: isHouseSaleCategory ? Number(houseWidthM) : undefined,
+      houseRoomCount: isHouseSaleCategory
+        ? Math.round(Number(houseRoomCount))
+        : undefined,
+      houseLevels:
+        isHouseSaleCategory && houseLevels
+          ? (houseLevels as HouseSaleLevel)
+          : undefined,
       updatedAt: new Date().toISOString(),
     };
 
-    try {
-      const response = await apiFetch(`/api/listings/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentUser?.id ? { 'x-bzy-user-id': currentUser.id } : {}),
-        },
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('patch failed');
-      const data = await response.json();
-      const updated = normalizeItem(data?.item ?? { ...item, ...updates });
-      const updatedItems = readMarketplaceItems().map((entry) =>
-        entry.id === item.id ? updated : entry
-      );
-      writeMarketplaceItems(updatedItems);
-    } catch {
-      alert('Impossible de modifier pour le moment. Réessaie.');
-      return;
+    const localImages = updates.images ?? item.images;
+    const apiImages = await prepareListingImagesForApi(localImages);
+    const updatesForApi = { ...updates, images: apiImages };
+
+    let saved: MarketplaceItem | null = null;
+    let savedLocally = false;
+    let lastResponseStatus: number | null = null;
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const response = await apiFetch(`/api/listings/${item.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentUser?.id ? { 'x-bzy-user-id': currentUser.id } : {}),
+          },
+          body: JSON.stringify(updatesForApi),
+        });
+        lastResponseStatus = response.status;
+        if (!response.ok) {
+          const transient = response.status === 502 || response.status === 503;
+          if (transient && attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
+            continue;
+          }
+          throw new Error('patch failed');
+        }
+        const data = await response.json();
+        const fromServer = normalizeItem(data?.item ?? { ...item, ...updatesForApi });
+        saved = normalizeItem({
+          ...fromServer,
+          images: mergeListingImages(localImages, fromServer.images),
+          updatedAt: new Date().toISOString(),
+        });
+        break;
+      } catch {
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
+          continue;
+        }
+      }
     }
 
-    alert('Annonce modifiée avec succès.');
+    if (!saved) {
+      saved = normalizeItem({
+        ...item,
+        ...updates,
+        images: localImages,
+        id: item.id,
+      });
+      savedLocally = true;
+    }
+
+    const base = combineLocalListingSnapshots();
+    const next = base.some((entry) => entry.id === item.id)
+      ? base.map((entry) => (entry.id === item.id ? saved! : entry))
+      : [saved, ...base];
+    writeMarketplaceItems(next);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bzy-listings-updated'));
+    }
+
+    alert(
+      savedLocally
+        ? `Annonce modifiée localement (serveur indisponible${
+            lastResponseStatus ? `, code ${lastResponseStatus}` : ''
+          }).`
+        : 'Annonce modifiée avec succès.'
+    );
     router.push('/mes-annonces');
   };
 
@@ -333,14 +448,24 @@ export default function ModifierAnnoncePage() {
   const houseSaleCellInner =
     'w-full min-w-0 border-0 bg-transparent px-1.5 py-2.5 text-[11px] text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 sm:px-2 sm:text-sm';
 
-  if (!item) {
+  if (loadState === 'loading' || !item) {
     return (
       <main className="min-h-screen bg-[#efefef] px-0 py-0 md:px-4 md:py-8">
         <MobileShell>
           <div className="min-h-full bg-white p-5">
             <p className="text-base font-medium text-gray-600">
-              Annonce introuvable.
+              {loadState === 'missing'
+                ? 'Annonce introuvable.'
+                : 'Chargement de l’annonce…'}
             </p>
+            {loadState === 'missing' && (
+              <Link
+                href="/mes-annonces"
+                className="mt-4 inline-block text-sm font-semibold text-green-700"
+              >
+                Retour à Mes annonces
+              </Link>
+            )}
           </div>
         </MobileShell>
       </main>
@@ -370,6 +495,9 @@ export default function ModifierAnnoncePage() {
                 placeholder="Titre de l’annonce"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                data-publish-error={
+                  submitted && !title.trim() ? 'true' : undefined
+                }
                 className={`${fieldClass} ${
                   submitted && !title.trim() ? errorClass : ''
                 }`}
@@ -512,6 +640,9 @@ export default function ModifierAnnoncePage() {
                   setHouseLevels('');
                   setHouseAreaM2('');
                 }}
+                data-publish-error={
+                  submitted && category === 'Catégories' ? 'true' : undefined
+                }
                 className={`${fieldClass} ${
                   submitted && category === 'Catégories' ? errorClass : ''
                 }`}
@@ -790,5 +921,13 @@ export default function ModifierAnnoncePage() {
         </div>
       </MobileShell>
     </main>
+  );
+}
+
+export default function ModifierAnnoncePage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#efefef]" />}>
+      <ModifierAnnoncePageContent />
+    </Suspense>
   );
 }

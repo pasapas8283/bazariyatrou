@@ -24,11 +24,13 @@ function isAllowedApiOrigin(origin: string): boolean {
 
 function applyApiCors(request: NextRequest, response: NextResponse): NextResponse {
   const origin = request.headers.get('origin');
-  if (!origin || !isAllowedApiOrigin(origin)) {
-    return response;
+  if (origin && isAllowedApiOrigin(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+  } else {
+    // WebView Capacitor / clients sans en-tête Origin
+    response.headers.set('Access-Control-Allow-Origin', '*');
   }
-  response.headers.set('Access-Control-Allow-Origin', origin);
-  response.headers.set('Access-Control-Allow-Credentials', 'true');
   response.headers.set(
     'Access-Control-Allow-Methods',
     'GET, POST, PATCH, PUT, DELETE, OPTIONS'

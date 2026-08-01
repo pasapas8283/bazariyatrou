@@ -1,8 +1,25 @@
 import type { MarketplaceItem } from '../types/marketplace';
+import { mergeListingImages } from './listing-images';
 import { apiFetch } from './api-origin';
 import { defaultMarketplaceItems } from './marketplace-default-items';
 import { normalizeItem } from './marketplace-normalizers';
 import { combineLocalListingSnapshots } from './marketplace-storage';
+
+const DEMO_LISTING_IDS = new Set(['1', '2', '3', '4']);
+
+/** Masque les 4 annonces démo quand il existe au moins une vraie annonce. */
+function withoutDemoWhenUserListingsExist(
+  items: MarketplaceItem[]
+): MarketplaceItem[] {
+  const hasUserListing = items.some((item) => !DEMO_LISTING_IDS.has(item.id));
+  if (!hasUserListing) return items;
+  return items.filter((item) => !DEMO_LISTING_IDS.has(item.id));
+}
+
+function finalizeListingList(items: MarketplaceItem[]): MarketplaceItem[] {
+  const cleaned = withoutDemoWhenUserListingsExist(items);
+  return cleaned.length === 0 ? defaultMarketplaceItems : cleaned;
+}
 
 /**
  * Fusionne les annonces serveur avec celles présentes uniquement en local
@@ -37,11 +54,12 @@ export function mergeApiListingsWithLocal(
       byId.set(localItem.id, localItem);
       continue;
     }
-    // Garde la version la plus récente pour éviter d'écraser un statut local récent
-    // (ex. "reserved") par une réponse API plus ancienne.
-    if (recencyMs(localItem) > recencyMs(existing)) {
-      byId.set(localItem.id, localItem);
-    }
+    const winner =
+      recencyMs(localItem) > recencyMs(existing) ? localItem : existing;
+    byId.set(localItem.id, {
+      ...winner,
+      images: mergeListingImages(localItem.images, existing.images),
+    });
   }
 
   const merged = Array.from(byId.values());
@@ -64,9 +82,9 @@ export async function loadMergedMarketplaceItems(): Promise<MarketplaceItem[]> {
     const data = await response.json();
     const apiItems = Array.isArray(data?.items) ? data.items : [];
     const merged = mergeApiListingsWithLocal(apiItems);
-    return merged.length === 0 ? defaultMarketplaceItems : merged;
+    return finalizeListingList(merged);
   } catch {
     const pooled = combineLocalListingSnapshots();
-    return pooled.length === 0 ? defaultMarketplaceItems : pooled;
+    return finalizeListingList(pooled);
   }
 }

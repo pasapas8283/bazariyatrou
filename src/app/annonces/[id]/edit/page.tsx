@@ -1,31 +1,60 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth-storage';
-import { getMarketplaceItemById } from '@/lib/marketplace-storage';
+import { combineLocalListingSnapshots } from '@/lib/marketplace-storage';
+import { loadMergedMarketplaceItems } from '@/lib/listings-merge';
 
 export default function EditAnnoncePage() {
   const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = decodeURIComponent(String(params.id ?? ''));
+  const [status, setStatus] = useState('Redirection…');
 
   useEffect(() => {
-    const item = getMarketplaceItemById(id);
-    const currentUser = getCurrentUser();
+    let cancelled = false;
 
-    if (!item) {
-      router.replace('/mes-annonces');
-      return;
-    }
+    const run = async () => {
+      if (!id) {
+        router.replace('/mes-annonces');
+        return;
+      }
 
-    if (!currentUser || item.sellerId !== currentUser.id) {
-      router.replace(`/annonces/detail?id=${encodeURIComponent(id)}`);
-      return;
-    }
+      let item =
+        combineLocalListingSnapshots().find((entry) => entry.id === id) ?? null;
+      if (!item) {
+        try {
+          const merged = await loadMergedMarketplaceItems();
+          item = merged.find((entry) => entry.id === id) ?? null;
+        } catch {
+          item = null;
+        }
+      }
+      if (cancelled) return;
 
-    router.replace(`/mes-annonces/${id}/modifier`);
+      if (!item) {
+        setStatus('Annonce introuvable.');
+        router.replace('/mes-annonces');
+        return;
+      }
+
+      const currentUser = getCurrentUser();
+      if (!currentUser || item.sellerId !== currentUser.id) {
+        router.replace(`/annonces/${encodeURIComponent(id)}`);
+        return;
+      }
+
+      router.replace(
+        `/mes-annonces/modifier?id=${encodeURIComponent(id)}`
+      );
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [id, router]);
 
-  return <div className="p-4">Redirection...</div>;
+  return <div className="p-4 text-sm text-gray-600">{status}</div>;
 }

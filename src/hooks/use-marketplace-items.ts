@@ -18,14 +18,15 @@ export function useMarketplaceItems() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const refresh = async () => {
       const next = await loadMergedMarketplaceItems();
       if (!cancelled) {
         setItems(next);
         writeMarketplaceItems(next);
         setHydrated(true);
       }
-    })();
+    };
+    void refresh();
     return () => {
       cancelled = true;
     };
@@ -45,6 +46,12 @@ export function useMarketplaceItems() {
         }
       })();
     };
+
+    const onListingsUpdated = () => {
+      pull();
+    };
+
+    window.addEventListener('bzy-listings-updated', onListingsUpdated);
 
     const startPolling = () => {
       if (intervalId !== undefined) return;
@@ -76,6 +83,7 @@ export function useMarketplaceItems() {
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('bzy-listings-updated', onListingsUpdated);
       stopPolling();
     };
   }, []);

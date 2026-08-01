@@ -37,12 +37,11 @@ import {
   ISLAND_OPTIONS,
 } from '../../lib/comoros-locations';
 import { normalizeItem } from '../../lib/marketplace-normalizers';
-import {
-  readMarketplaceItems,
-  writeMarketplaceItems,
-} from '../../lib/marketplace-storage';
+import { prependMarketplaceItem } from '../../lib/marketplace-storage';
 import { readPlatformSettings } from '../../lib/platform-settings-storage';
 import { apiFetch } from '@/lib/api-origin';
+import { Capacitor } from '@capacitor/core';
+import { prepareListingImagesForApi, mergeListingImages } from '@/lib/listing-images';
 
 function PublishFormSection({
   title,
@@ -66,7 +65,7 @@ export default function PublierPage() {
    * Ajuste facilement la hauteur de sécurité sous le bouton "Publier"
    * pour les barres de navigation Android / zones gestuelles iOS.
    */
-  const MOBILE_SUBMIT_EXTRA_CLEARANCE = '4.5rem';
+  const MOBILE_SUBMIT_EXTRA_CLEARANCE = '5.5rem';
 
   const router = useRouter();
   const { currentUser } = useAuth();
@@ -101,6 +100,7 @@ export default function PublierPage() {
   const [houseRoomCount, setHouseRoomCount] = useState('');
   const [houseLevels, setHouseLevels] = useState<HouseSaleLevel | ''>('');
   const [submitted, setSubmitted] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const formatPriceForInput = (digits: string) =>
     digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -140,10 +140,11 @@ export default function PublierPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPublishing) return;
     setSubmitted(true);
 
     if (!currentUser) {
-      alert('Tu dois être connecté pour publier');
+      alert('Tu dois être connecté pour publier.');
       router.push('/connexion');
       return;
     }
@@ -193,26 +194,36 @@ export default function PublierPage() {
     const hasHouseLevelsError =
       isHouseSaleCategory && !String(houseLevels).trim();
 
-    if (
-      hasTitleError ||
-      hasPriceError ||
-      hasCategoryError ||
-      hasSubCategoryError ||
-      hasSubSubCategoryError ||
-      hasConditionError ||
-      hasIslandError ||
-      hasCityError ||
-      hasCustomCityError ||
-      hasTerrainSettingError ||
-      hasTerrainLengthError ||
-      hasTerrainWidthError ||
-      hasTerrainAreaM2Error ||
-      hasHouseAreaM2Error ||
-      hasHouseLengthError ||
-      hasHouseWidthError ||
-      hasHouseRoomCountError ||
-      hasHouseLevelsError
-    ) {
+    const missingFields: string[] = [];
+    if (hasTitleError) missingFields.push('titre');
+    if (hasPriceError) missingFields.push('prix');
+    if (hasCategoryError) missingFields.push('catégorie');
+    if (hasSubCategoryError) missingFields.push('sous-catégorie');
+    if (hasSubSubCategoryError) missingFields.push('sous-sous-catégorie');
+    if (hasConditionError) missingFields.push('état');
+    if (hasIslandError) missingFields.push('île');
+    if (hasCityError || hasCustomCityError) missingFields.push('ville');
+    if (hasTerrainSettingError) missingFields.push('type de terrain');
+    if (hasTerrainLengthError || hasTerrainWidthError) {
+      missingFields.push('dimensions du terrain');
+    }
+    if (hasTerrainAreaM2Error) missingFields.push('surface du terrain');
+    if (hasHouseAreaM2Error) missingFields.push('surface maison');
+    if (hasHouseLengthError || hasHouseWidthError) {
+      missingFields.push('dimensions maison');
+    }
+    if (hasHouseRoomCountError) missingFields.push('nombre de pièces');
+    if (hasHouseLevelsError) missingFields.push('niveaux maison');
+
+    if (missingFields.length > 0) {
+      alert(
+        `Complète les champs obligatoires : ${missingFields.join(', ')}.`
+      );
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>('[data-publish-error="true"]')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
 
@@ -221,12 +232,16 @@ export default function PublierPage() {
       whatsappPhone.trim() ||
       (currentUser.phone && currentUser.phone.trim());
     if (!hasContactHint) {
-      const proceed = window.confirm(
-        'Vous n’avez pas indiqué de numéro (téléphone ou WhatsApp). C’est fortement recommandé : les acheteurs pourront vous joindre plus facilement. Vous pouvez quand même publier. Continuer ?'
-      );
-      if (!proceed) return;
+      if (!Capacitor.isNativePlatform()) {
+        const proceed = window.confirm(
+          'Vous n’avez pas indiqué de numéro (téléphone ou WhatsApp). C’est fortement recommandé : les acheteurs pourront vous joindre plus facilement. Vous pouvez quand même publier. Continuer ?'
+        );
+        if (!proceed) return;
+      }
     }
 
+    setIsPublishing(true);
+    try {
     const cleanedImages = images
       .map((img) => img.trim())
       .filter((img) => img !== '');
@@ -268,6 +283,7 @@ export default function PublierPage() {
       sellerId: currentUser.id,
       sellerName: currentUser.firstName,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       status: 'available',
       phone:
         settings.showPhoneOnListings
@@ -317,13 +333,15 @@ export default function PublierPage() {
     let created: MarketplaceItem | null = null;
     let publishedLocally = false;
     let lastResponseStatus: number | null = null;
+    const apiImages = await prepareListingImagesForApi(newItem.images);
+    const itemForApi: MarketplaceItem = { ...newItem, images: apiImages };
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         const response = await apiFetch('/api/listings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newItem),
+          body: JSON.stringify(itemForApi),
         });
         lastResponseStatus = response.status;
         if (!response.ok) {
@@ -335,7 +353,12 @@ export default function PublierPage() {
           throw new Error('create failed');
         }
         const data = await response.json();
-        created = normalizeItem(data?.item ?? newItem);
+        const fromServer = normalizeItem(data?.item ?? itemForApi);
+        created = normalizeItem({
+          ...fromServer,
+          images: mergeListingImages(newItem.images, fromServer.images),
+          updatedAt: new Date().toISOString(),
+        });
         break;
       } catch {
         if (attempt < maxAttempts) {
@@ -355,9 +378,14 @@ export default function PublierPage() {
       return;
     }
 
-    const existing = readMarketplaceItems();
-    const withoutDup = existing.filter((i) => i.id !== created.id);
-    writeMarketplaceItems([created, ...withoutDup]);
+    const storedItem = normalizeItem({
+      ...created,
+      images: apiImages,
+    });
+    prependMarketplaceItem(storedItem);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bzy-listings-updated'));
+    }
 
     alert(
       publishedLocally
@@ -394,6 +422,9 @@ export default function PublierPage() {
     setSubmitted(false);
 
     router.push('/');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const fieldClass =
@@ -457,6 +488,9 @@ export default function PublierPage() {
               {/* 1 — Catégorie */}
               <select
                 value={category}
+                data-publish-error={
+                  submitted && category === 'Catégories' ? 'true' : undefined
+                }
                 onChange={(e) => {
                   setCategory(e.target.value);
                   setSubCategory('');
@@ -585,6 +619,9 @@ export default function PublierPage() {
                 type="text"
                 placeholder="Titre"
                 value={title}
+                data-publish-error={
+                  submitted && !title.trim() ? 'true' : undefined
+                }
                 onChange={(e) => setTitle(e.target.value)}
                 className={`${fieldClass} ${
                   submitted && !title.trim() ? errorClass : ''
@@ -795,7 +832,11 @@ export default function PublierPage() {
                 )}
 
               {/* 8 — Prix */}
-              <div>
+              <div
+                data-publish-error={
+                  submitted && !price.trim() ? 'true' : undefined
+                }
+              >
                 <div
                   className={`flex items-stretch gap-2 rounded-2xl border p-1.5 focus-within:ring-2 focus-within:ring-green-100 ${
                     submitted && !price.trim()
@@ -1011,16 +1052,18 @@ export default function PublierPage() {
             </PublishFormSection>
 
             <div
-              className="sticky bottom-0 z-20 -mx-4 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0"
+              className="sticky bottom-0 z-40 -mx-4 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0"
               style={{
-                paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+                paddingBottom:
+                  'max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem))',
               }}
             >
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-green-700 py-4 text-white"
+                disabled={isPublishing}
+                className="min-h-[52px] w-full touch-manipulation rounded-2xl bg-green-700 py-4 text-base font-semibold text-white disabled:opacity-70"
               >
-                Publier
+                {isPublishing ? 'Publication…' : 'Publier'}
               </button>
             </div>
           </form>

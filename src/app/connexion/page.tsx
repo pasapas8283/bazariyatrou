@@ -15,22 +15,38 @@ export default function ConnexionPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setSubmitted(true);
 
-    if (!identifier.trim() || !password.trim()) return;
-
-    const result = login({ phone: identifier, password });
-
-    if (!result.ok) {
-      alert(result.message);
+    if (!identifier.trim() || !password.trim()) {
+      alert('Indique ton nom ou numéro, et ton mot de passe.');
       return;
     }
 
-    alert('Connexion réussie.');
-    router.push('/profil');
+    setIsSubmitting(true);
+    try {
+      const result = login({ phone: identifier, password });
+
+      if (!result.ok) {
+        alert(result.message);
+        return;
+      }
+
+      alert('Connexion réussie.');
+      router.push('/profil');
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Impossible de se connecter. Réessaie.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const fieldClass =
@@ -53,65 +69,69 @@ export default function ConnexionPage() {
             </Link>
             <div className="h-9 w-9" aria-hidden />
           </div>
-          <div className="px-4 py-6">
-          <h1 className="text-2xl font-extrabold text-gray-900">
-            Connexion
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Connectez-vous avec votre nom ou votre numéro et mot de passe.
-          </p>
+          <div className="px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom,0px))]">
+            <h1 className="text-2xl font-extrabold text-gray-900">
+              Connexion
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Connectez-vous avec votre nom ou votre numéro et mot de passe.
+            </p>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <input
-                type="text"
-                placeholder="Nom ou numéro de téléphone"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                className={fieldClass}
-              />
-              {submitted && !identifier.trim() && (
-                <p className="mt-1 text-sm text-red-600">
-                  Le nom ou le numéro est obligatoire
-                </p>
-              )}
-            </div>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Nom ou numéro de téléphone"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className={fieldClass}
+                />
+                {submitted && !identifier.trim() && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Le nom ou le numéro est obligatoire
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <PasswordField
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={fieldClass}
-                autoComplete="current-password"
-              />
-              {submitted && !password.trim() && (
-                <p className="mt-1 text-sm text-red-600">
-                  Le mot de passe est obligatoire
-                </p>
-              )}
-            </div>
+              <div>
+                <PasswordField
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={fieldClass}
+                  autoComplete="current-password"
+                />
+                {submitted && !password.trim() && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Le mot de passe est obligatoire
+                  </p>
+                )}
+              </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-2xl bg-green-700 py-4 text-base font-bold text-white hover:bg-green-800"
-            >
-              Se connecter
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="min-h-[52px] w-full touch-manipulation rounded-2xl bg-green-700 py-4 text-base font-bold text-white hover:bg-green-800 disabled:opacity-70"
+              >
+                {isSubmitting ? 'Connexion…' : 'Se connecter'}
+              </button>
+            </form>
 
-          <p className="mt-3 text-right text-sm">
-            <Link href="/mot-de-passe-oublie" className="font-semibold text-green-700">
-              Mot de passe oublié ?
-            </Link>
-          </p>
+            <p className="mt-3 text-right text-sm">
+              <Link
+                href="/mot-de-passe-oublie"
+                className="font-semibold text-green-700"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </p>
 
-          <p className="mt-4 text-center text-sm text-gray-500">
-            Pas encore de compte ?{' '}
-            <Link href="/inscription" className="font-semibold text-green-700">
-              S’inscrire
-            </Link>
-          </p>
+            <p className="mt-4 text-center text-sm text-gray-500">
+              Pas encore de compte ?{' '}
+              <Link href="/inscription" className="font-semibold text-green-700">
+                S’inscrire
+              </Link>
+            </p>
           </div>
         </div>
       </MobileShell>

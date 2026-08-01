@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import ListingImage from '@/components/ListingImage';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -74,15 +74,19 @@ function WhatsAppGlyph({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-function AnnonceDetailPageContent() {
+export function AnnonceDetailPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const id = useMemo(() => {
+    // Priorité au ?id= (route /annonces/detail?id=…) pour éviter le conflit
+    // avec le segment dynamique [id] = "detail".
+    const fromQuery = searchParams.get('id')?.trim();
+    if (fromQuery) return fromQuery;
     const raw = params.id;
     if (Array.isArray(raw)) return raw[0] ?? '';
-    if (typeof raw === 'string' && raw) return raw;
-    return searchParams.get('id') ?? '';
+    if (typeof raw === 'string' && raw && raw !== 'detail') return raw;
+    return '';
   }, [params.id, searchParams]);
 
   const { currentUser } = useAuth();
@@ -189,7 +193,7 @@ function AnnonceDetailPageContent() {
 
   const listingUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/annonces/detail?id=${encodeURIComponent(id)}`
+      ? `${window.location.origin}/annonces/${encodeURIComponent(id)}`
       : '';
   const shareText = product
     ? `Regarde cette annonce sur BazariYatrou: ${product.title}`
@@ -693,7 +697,7 @@ function AnnonceDetailPageContent() {
                 onClick={() => openGalleryAt(selectedImage || productImages[0])}
                 className="block w-full"
               >
-                <Image
+                <ListingImage
                   src={selectedImage || productImages[0]}
                   alt={product.title}
                   width={1400}
@@ -828,7 +832,7 @@ function AnnonceDetailPageContent() {
                       : 'border-gray-200'
                   }`}
                 >
-                  <Image
+                  <ListingImage
                     src={img}
                     width={80}
                     height={64}
@@ -858,7 +862,7 @@ function AnnonceDetailPageContent() {
             {isOwner ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-3">
                 <Link
-                  href={`/annonces/${product.id}/edit`}
+                  href={`/mes-annonces/modifier?id=${encodeURIComponent(product.id)}`}
                   className="block w-full rounded-2xl bg-gray-900 py-4 text-center font-bold text-white"
                 >
                   ✏️ Modifier
@@ -1016,7 +1020,7 @@ function AnnonceDetailPageContent() {
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <Image
+            <ListingImage
               src={selectedImage || productImages[0]}
               alt={product.title}
               width={1600}

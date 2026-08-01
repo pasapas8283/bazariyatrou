@@ -49,7 +49,20 @@ export function readAuthState(): AuthState {
 
 export function writeAuthState(state: AuthState) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    const name =
+      error && typeof error === 'object' && 'name' in error
+        ? String((error as { name?: string }).name)
+        : '';
+    if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      throw new Error(
+        'Espace de stockage insuffisant. Réessaie sans photo de profil, ou avec une photo plus légère.'
+      );
+    }
+    throw error;
+  }
 }
 
 export function getCurrentUser(): AuthUser | null {
@@ -104,7 +117,35 @@ export function registerUser(input: {
     users: [newUser, ...state.users],
   };
 
-  writeAuthState(nextState);
+  try {
+    writeAuthState(nextState);
+  } catch (error) {
+    // Retry without avatar if storage quota is the issue.
+    if (newUser.avatar) {
+      try {
+        const withoutAvatar = { ...newUser, avatar: undefined };
+        writeAuthState({
+          currentUser: withoutAvatar,
+          users: [withoutAvatar, ...state.users],
+        });
+        return {
+          ok: true as const,
+          user: withoutAvatar,
+          warning:
+            'Compte créé, mais la photo de profil n’a pas pu être enregistrée (trop lourde).',
+        };
+      } catch {
+        /* fall through */
+      }
+    }
+    return {
+      ok: false as const,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Impossible d’enregistrer le compte sur cet appareil.',
+    };
+  }
 
   return {
     ok: true as const,

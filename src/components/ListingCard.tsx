@@ -1,8 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import ListingFavoriteButton from './ListingFavoriteButton';
+import ListingImage from './ListingImage';
 import { getConditionBadgeClass } from '../lib/marketplace-conditions';
 import { getCategoryLabel } from '../lib/marketplace-categories';
 
@@ -32,7 +32,7 @@ export default function ListingCard({
   const router = useRouter();
   const hideCondition = category === getCategoryLabel('location');
   const go = () => {
-    void router.push(`/annonces/detail?id=${encodeURIComponent(id)}`);
+    void router.push(`/annonces/${encodeURIComponent(id)}`);
   };
 
   return (
@@ -50,7 +50,7 @@ export default function ListingCard({
     >
       <article className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md">
         <div className="relative">
-          <Image
+          <ListingImage
             src={image || 'https://placehold.co/600x400?text=Annonce'}
             alt={title}
             width={600}

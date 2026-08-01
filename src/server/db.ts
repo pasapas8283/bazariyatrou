@@ -151,13 +151,8 @@ export async function readDb(): Promise<DbShape> {
 
 export async function writeDb(next: DbShape) {
   if (isSupabaseEnabled()) {
-    try {
-      await writeSupabaseDb(next);
-      return;
-    } catch {
-      // Fall back to local file write when remote storage is unavailable.
-      // This keeps core flows usable during setup/recovery.
-    }
+    await writeSupabaseDb(next);
+    return;
   }
 
   await ensureDbFile();

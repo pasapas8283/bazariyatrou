@@ -133,7 +133,7 @@ function ConversationDetailPageContent() {
       const found = listings.find((item) => item.id === listingId);
 
       if (found && found.status === 'available') {
-        router.push(`/annonces/detail?id=${encodeURIComponent(listingId)}`);
+        router.push(`/annonces/${encodeURIComponent(listingId)}`);
         return;
       }
     } catch {

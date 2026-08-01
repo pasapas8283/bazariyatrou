@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import ListingImage from '@/components/ListingImage';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMarketplaceItems } from '../../hooks/use-marketplace-items';
@@ -211,20 +211,20 @@ export default function AnnoncesPage() {
                 className="block cursor-pointer overflow-hidden rounded-3xl border bg-white shadow-sm transition hover:shadow-md"
                 onClick={() =>
                   void router.push(
-                    `/annonces/detail?id=${encodeURIComponent(item.id)}`
+                    `/annonces/${encodeURIComponent(item.id)}`
                   )
                 }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     void router.push(
-                      `/annonces/detail?id=${encodeURIComponent(item.id)}`
+                      `/annonces/${encodeURIComponent(item.id)}`
                     );
                   }
                 }}
               >
                 <div className="relative aspect-[4/3] w-full bg-gray-100">
-                  <Image
+                  <ListingImage
                     src={
                       item.images?.[0] ||
                       'https://placehold.co/600x400?text=Annonce'

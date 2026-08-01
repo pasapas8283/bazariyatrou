@@ -5,17 +5,27 @@ import { fileURLToPath } from "url";
 /** Évite que Turbopack prenne un `package-lock.json` dans un dossier parent (ex. `C:\\Users\\…`). */
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const isSharedBeta = process.env.BZY_SHARED_BETA === "1";
+const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_CAP_API_ORIGIN:
+      process.env.NEXT_PUBLIC_CAP_API_ORIGIN ||
+      process.env.CAP_SERVER_URL ||
+      "https://bazariyatrou-2.onrender.com",
+  },
   turbopack: {
     root: projectRoot,
   },
   reactCompiler: true,
   /**
-   * - APK local: export statique
-   * - Beta partagée: serveur Next (standalone) pour API + données communes
+   * - `next dev` : pas d’export (sinon UUID dynamiques + /api cassés)
+   * - APK Capacitor : export statique (BZY_SHARED_BETA=0)
+   * - Beta partagée Render : standalone (BZY_SHARED_BETA=1)
    */
-  output: isSharedBeta ? "standalone" : "export",
+  ...(isDev
+    ? {}
+    : { output: isSharedBeta ? ("standalone" as const) : ("export" as const) }),
   images: {
     unoptimized: true,
   },

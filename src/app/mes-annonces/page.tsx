@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import ListingImage from '@/components/ListingImage';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -145,7 +145,7 @@ function MesAnnoncesPageContent() {
                     className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm"
                   >
                     <div className="relative">
-                      <Image
+                      <ListingImage
                         src={
                           item.images?.[0] ||
                           'https://placehold.co/600x400?text=Annonce'
@@ -216,7 +216,9 @@ function MesAnnoncesPageContent() {
   <button
     type="button"
     onClick={() =>
-      void router.push(`/annonces/detail?id=${encodeURIComponent(item.id)}`)
+      void router.push(
+        `/annonces/detail?id=${encodeURIComponent(item.id)}`
+      )
     }
     className="rounded-2xl border border-gray-200 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
   >
@@ -227,7 +229,7 @@ function MesAnnoncesPageContent() {
     type="button"
     onClick={() =>
       void router.push(
-        `/mes-annonces/${encodeURIComponent(item.id)}/modifier`
+        `/mes-annonces/modifier?id=${encodeURIComponent(item.id)}`
       )
     }
     className="rounded-2xl bg-blue-100 py-3 text-center text-sm font-semibold text-blue-700"

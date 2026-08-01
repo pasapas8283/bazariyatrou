@@ -56,6 +56,11 @@ function restoreApi(moved) {
 let moved = false;
 let exitCode = 1;
 try {
+  // Évite les types Turbopack/dev obsolètes (références /api) après un `next dev`.
+  const nextDir = join(root, ".next");
+  if (existsSync(nextDir)) {
+    rmSync(nextDir, { recursive: true, force: true });
+  }
   moved = moveApiAside();
   const result = spawnSync("npx", ["next", "build"], {
     stdio: "inherit",
