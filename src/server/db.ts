@@ -61,7 +61,20 @@ async function ensureDbFile() {
 }
 
 function isSupabaseEnabled() {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(normalizeSupabaseUrl() && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Accepte URL projet seule, avec slash final, ou déjà suffixée /rest/v1. */
+function normalizeSupabaseUrl(): string {
+  const raw = (SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  if (!raw) return '';
+  return raw.replace(/\/rest\/v1$/i, '');
+}
+
+function supabaseRestUrl(pathAndQuery: string): string {
+  const base = normalizeSupabaseUrl();
+  const suffix = pathAndQuery.startsWith('/') ? pathAndQuery : `/${pathAndQuery}`;
+  return `${base}/rest/v1${suffix}`;
 }
 
 function normalizeDbShape(parsed: unknown): DbShape {
@@ -76,20 +89,41 @@ function normalizeDbShape(parsed: unknown): DbShape {
   };
 }
 
-async function readSupabaseDb(): Promise<DbShape> {
-  const baseUrl = SUPABASE_URL as string;
-  const serviceRoleKey = SUPABASE_SERVICE_ROLE_KEY as string;
-  const url = `${baseUrl}/rest/v1/${encodeURIComponent(
-    SUPABASE_TABLE
-  )}?id=eq.${SUPABASE_STATE_ID}&select=data`;
+async function readFileDb(): Promise<DbShape> {
+  await ensureDbFile();
+  try {
+    const raw = await fs.readFile(activeDbFile, 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
+    return normalizeDbShape(parsed);
+  } catch {
+    return { ...defaultDb };
+  }
+}
 
-  const res = await fetch(url, {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-    },
-    cache: 'no-store',
-  });
+async function writeFileDb(next: DbShape) {
+  await ensureDbFile();
+  await fs.writeFile(activeDbFile, JSON.stringify(next, null, 2), 'utf-8');
+}
+
+async function readSupabaseDb(): Promise<DbShape> {
+  const serviceRoleKey = SUPABASE_SERVICE_ROLE_KEY as string;
+  const url = supabaseRestUrl(
+    `/${encodeURIComponent(SUPABASE_TABLE)}?id=eq.${SUPABASE_STATE_ID}&select=data`
+  );
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      cache: 'no-store',
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'fetch failed';
+    throw new Error(`Supabase unreachable (${detail})`);
+  }
 
   if (!res.ok) {
     throw new Error(`Supabase read failed (${res.status})`);
@@ -155,23 +189,28 @@ function leanDbForStorage(db: DbShape): DbShape {
 }
 
 async function writeSupabaseDb(next: DbShape) {
-  const baseUrl = SUPABASE_URL as string;
   const serviceRoleKey = SUPABASE_SERVICE_ROLE_KEY as string;
-  const url = `${baseUrl}/rest/v1/${encodeURIComponent(
-    SUPABASE_TABLE
-  )}?on_conflict=id`;
+  const url = supabaseRestUrl(
+    `/${encodeURIComponent(SUPABASE_TABLE)}?on_conflict=id`
+  );
 
   const payload = leanDbForStorage(next);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      Prefer: 'resolution=merge-duplicates,return=minimal',
-    },
-    body: JSON.stringify([{ id: SUPABASE_STATE_ID, data: payload }]),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([{ id: SUPABASE_STATE_ID, data: payload }]),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'fetch failed';
+    throw new Error(`Supabase unreachable (${detail})`);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
@@ -183,25 +222,56 @@ async function writeSupabaseDb(next: DbShape) {
   }
 }
 
+export async function probeStorage(): Promise<{
+  supabaseConfigured: boolean;
+  supabaseOk: boolean;
+  supabaseError?: string;
+  storage: 'supabase' | 'file';
+  dbFile: string;
+}> {
+  const supabaseConfigured = isSupabaseEnabled();
+  if (!supabaseConfigured) {
+    await ensureDbFile();
+    return {
+      supabaseConfigured: false,
+      supabaseOk: false,
+      storage: 'file',
+      dbFile: activeDbFile,
+    };
+  }
+
+  try {
+    await readSupabaseDb();
+    return {
+      supabaseConfigured: true,
+      supabaseOk: true,
+      storage: 'supabase',
+      dbFile: activeDbFile,
+    };
+  } catch (error) {
+    await ensureDbFile();
+    return {
+      supabaseConfigured: true,
+      supabaseOk: false,
+      supabaseError:
+        error instanceof Error ? error.message : 'Supabase unavailable',
+      storage: 'file',
+      dbFile: activeDbFile,
+    };
+  }
+}
+
 export async function readDb(): Promise<DbShape> {
   if (isSupabaseEnabled()) {
     try {
       return await readSupabaseDb();
     } catch {
-      // Do not fail build/prerender if Supabase is temporarily unavailable
-      // or table setup is not finished yet.
-      return { ...defaultDb };
+      // Supabase down / paused → fichier local sur l’instance Render.
+      return await readFileDb();
     }
   }
 
-  await ensureDbFile();
-  try {
-    const raw = await fs.readFile(activeDbFile, 'utf-8');
-    const parsed = JSON.parse(raw) as unknown;
-    return normalizeDbShape(parsed);
-  } catch {
-    return { ...defaultDb };
-  }
+  return await readFileDb();
 }
 
 export async function writeDb(next: DbShape) {
@@ -209,9 +279,13 @@ export async function writeDb(next: DbShape) {
   if (isSupabaseEnabled()) {
     try {
       await writeSupabaseDb(payload);
+      try {
+        await writeFileDb(payload);
+      } catch {
+        /* miroir fichier optionnel */
+      }
       return;
     } catch (firstError) {
-      // Dernier recours : annonces sans data URL (métadonnées partagées).
       const stripped: DbShape = {
         ...payload,
         listings: payload.listings.map((item) => ({
@@ -225,13 +299,23 @@ export async function writeDb(next: DbShape) {
       };
       try {
         await writeSupabaseDb(stripped);
+        try {
+          await writeFileDb(stripped);
+        } catch {
+          /* ignore */
+        }
         return;
       } catch {
-        throw firstError;
+        // Fallback fichier : permet A→B tant que l’instance Render reste chaude.
+        try {
+          await writeFileDb(payload);
+          return;
+        } catch {
+          throw firstError;
+        }
       }
     }
   }
 
-  await ensureDbFile();
-  await fs.writeFile(activeDbFile, JSON.stringify(payload, null, 2), 'utf-8');
+  await writeFileDb(payload);
 }
